@@ -68,7 +68,15 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       attributionControl: { compact: true },
     })
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+    // Start with the attribution folded to its "i" button; it still opens on tap, as the map data licenses require.
+    const foldAttribution = () => {
+      const a = m.getContainer().querySelector('.maplibregl-ctrl-attrib')
+      a?.classList.remove('maplibregl-compact-show')
+      a?.removeAttribute('open')
+    }
+    m.once('idle', foldAttribution)
     m.on('load', () => {
+      foldAttribution()
       m.addSource('zone', { type: 'geojson', data: empty })
       m.addSource('route', { type: 'geojson', data: empty })
       m.addSource('link', { type: 'geojson', data: empty })
