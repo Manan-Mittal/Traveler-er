@@ -12,7 +12,7 @@ import { Btn, Input, Sub } from './kit'
 
 const plural = (n: number, word: string, many = word + 's') => `${n} ${n === 1 ? word : many}`
 
-type Stage = { kind: 'pick'; error?: string } | { kind: 'working'; done: number; total: number } | { kind: 'review'; groups: CountryGroup[]; missing: RawPlace[] }
+type Stage = { kind: 'pick'; error?: string } | { kind: 'working'; done: number; total: number } | { kind: 'review'; groups: CountryGroup[]; missing: RawPlace[]; notes: string[] }
 
 /** Import Google Maps saved lists from a Takeout export and file them into trips by country and city. */
 export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose: () => void }) {
@@ -21,13 +21,21 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
   const [link, setLink] = useState('')
   const input = useRef<HTMLInputElement>(null)
   const abort = useRef<AbortController | null>(null)
+  const stop = useRef(false)
   useEffect(() => () => abort.current?.abort(), [])
 
-  const resolve = async (places: RawPlace[]) => {
+  const resolve = async (places: RawPlace[], skipped: string[] = []) => {
+    if (!places.length) return setStage({ kind: 'pick', error: 'That list has no places in it.' })
     abort.current = new AbortController()
+    stop.current = false
     setStage({ kind: 'working', done: 0, total: places.length })
-    const { found, missing } = await resolvePlaces(places, (done, total) => setStage({ kind: 'working', done, total }), abort.current.signal)
-    setStage({ kind: 'review', groups: groupPlaces(found), missing })
+    const { found, missing, lookupFailed } = await resolvePlaces(places, (done, total) => setStage({ kind: 'working', done, total }), abort.current.signal, () => stop.current)
+    const notes = [
+      ...(lookupFailed ? ["The place lookup service didn't answer for some places, so their city or location may be missing. Try again in a few minutes."] : []),
+      ...(skipped.length ? [`Couldn't read ${skipped.join(', ')}.`] : []),
+      ...(stop.current && missing.length ? [`Stopped early, so some places weren't looked up yet. Import the same file again later to finish; places already found load instantly.`] : []),
+    ]
+    setStage({ kind: 'review', groups: groupPlaces(found), missing, notes })
   }
   const fail = (e: unknown) => (e as Error).name !== 'AbortError' && setStage({ kind: 'pick', error: (e as Error).message })
 
@@ -39,7 +47,7 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
         setStage({ kind: 'pick', error: skipped.length ? `Couldn't read ${skipped.join(', ')}.` : 'No saved places in those files. Pick the Saved folder or Saved Places.json from your Takeout export.' })
         return
       }
-      await resolve(places)
+      await resolve(places, skipped)
     } catch (e) {
       fail(e)
     }
@@ -113,6 +121,9 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
             <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${stage.total ? (stage.done / stage.total) * 100 : 5}%` }} />
           </div>
           <Sub>{stage.total ? `Finding where your places are… ${stage.done} of ${stage.total}` : 'Opening your list…'}</Sub>
+          {stage.total > 20 && (
+            <Btn onClick={() => (stop.current = true)}>Stop here and review what's found</Btn>
+          )}
         </div>
       )}
 
@@ -121,6 +132,9 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
           <Sub>
             Found {plural(stage.groups.reduce((n, g) => n + g.count, 0), 'place')} in {plural(stage.groups.length, 'country', 'countries')}. Pick a trip for each; places land in its Saved places so you can drop them into days.
           </Sub>
+          {stage.notes.map((n) => (
+            <p key={n} className="text-[13px] text-[var(--danger)]">{n}</p>
+          ))}
           {stage.groups.map((g) => (
             <CountryCard key={g.countryCode || g.country} group={g} trips={trips} />
           ))}

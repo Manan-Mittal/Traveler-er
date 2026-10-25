@@ -17,6 +17,7 @@ export default function Cities({ trip }: { trip: Trip }) {
     )
   }
   const dayCount = (id: string) => trip.days.filter((d) => d.cityId === id).length
+  const unassigned = trip.days.filter((d) => !d.cityId).length
   return (
     <section className="space-y-2" aria-label="Cities">
       <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]">Cities</h2>
@@ -34,10 +35,12 @@ export default function Cities({ trip }: { trip: Trip }) {
         </div>
       )}
       <Search near={trip.cities.at(-1)} placeholder="Add a city, e.g. Taipei" onPick={(p) => actions.addCity(trip.id, { name: p.name, lat: p.lat, lon: p.lon })} />
-      {trip.cities.length > 1 && (
+      {trip.cities.length > 1 && unassigned > 0 && (
         <div className="flex items-center gap-2">
-          <Btn onClick={() => actions.splitDaysAcrossCities(trip.id)}>Split days evenly</Btn>
-          <Sub>Then tap a day to change its city.</Sub>
+          <Btn onClick={() => actions.splitDaysAcrossCities(trip.id)}>
+            Spread {unassigned} day{unassigned > 1 ? 's' : ''} across cities
+          </Btn>
+          <Sub>Days that already have a city stay put.</Sub>
         </div>
       )}
     </section>
