@@ -33,6 +33,7 @@ jobs:
         working-directory: web
         env:
           VITE_BASE: /Traveler-er/
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
