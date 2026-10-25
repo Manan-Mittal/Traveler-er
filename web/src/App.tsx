@@ -91,6 +91,8 @@ export default function App() {
                     <button
                       key={d.id}
                       onClick={() => actions.openDay(d.id)}
+                      aria-pressed={d.id === dayId}
+                      aria-label={`Day ${i + 1}, ${d.date}`}
                       className={`shrink-0 rounded-xl px-3 py-1.5 pointer-coarse:py-2.5 text-[13px] font-medium ${d.id === dayId ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--accent-soft)]'}`}
                     >
                       {i + 1}
