@@ -7,6 +7,7 @@ import DayView from './ui/DayView'
 import Bookings from './ui/Bookings'
 import Cities from './ui/Cities'
 import Inbox from './ui/Inbox'
+import Planner from './ui/Planner'
 import type { MapLink } from './MapView'
 import { zoneColor } from './zones'
 import { Btn, Sub, Title } from './ui/kit'
@@ -16,7 +17,7 @@ const SHEET_STOPS = [0.78, 0.45, 0.1]
 
 export default function App() {
   const { trips, tripId, dayId } = useStore()
-  const [tab, setTab] = useState<'days' | 'book'>('days')
+  const [tab, setTab] = useState<'days' | 'plan' | 'book'>('days')
   const trip = trips.find((t) => t.id === tripId)
   const day = trip?.days.find((d) => d.id === dayId)
   const geo = useDayGeo(day)
@@ -75,9 +76,14 @@ export default function App() {
             </div>
             <div className="flex gap-2">
               <Btn kind={tab === 'days' ? 'primary' : 'plain'} onClick={() => setTab('days')}>Days</Btn>
+              <Btn kind={tab === 'plan' ? 'primary' : 'plain'} onClick={() => setTab('plan')}>✨ Plan</Btn>
               <Btn kind={tab === 'book' ? 'primary' : 'plain'} onClick={() => setTab('book')}>Bookings</Btn>
             </div>
-            {tab === 'days' ? (
+            {/* Kept mounted while hidden so a review in progress survives switching tabs. */}
+            <div hidden={tab !== 'plan'}>
+              <Planner key={trip.id} trip={trip} />
+            </div>
+            {tab === 'plan' ? null : tab === 'days' ? (
               <>
                 <Cities trip={trip} />
                 <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
