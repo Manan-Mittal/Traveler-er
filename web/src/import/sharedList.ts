@@ -1,10 +1,11 @@
 import type { RawPlace } from './takeout'
+import { authHeaders } from '../auth'
 
 export const sharedListsEnabled = Boolean(import.meta.env.VITE_API_URL)
 
 /** Read a public Google Maps shared list through the worker (Google has no browser-callable API for it). */
 export async function fetchSharedList(link: string): Promise<RawPlace[]> {
-  const r = await fetch(`${import.meta.env.VITE_API_URL}/api/gmaps-list?url=${encodeURIComponent(link.trim())}`).catch(() => {
+  const r = await fetch(`${import.meta.env.VITE_API_URL}/api/gmaps-list?url=${encodeURIComponent(link.trim())}`, { headers: authHeaders() }).catch(() => {
     throw new Error("Couldn't reach the import service. Check your connection and try again.")
   })
   const body = (await r.json().catch(() => ({}))) as { name?: string; places?: { name: string; address: string; lat: number; lon: number; url?: string }[]; error?: string }

@@ -4,6 +4,7 @@ import type { Trip } from '../types'
 import { Btn, Input, Row, Sub, Title } from './kit'
 import { DateRangePicker } from './DatePicker'
 import ImportList from './ImportList'
+import Account from './Account'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 
 const MAX_DAYS = 366
@@ -26,6 +27,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
 
   return (
     <div className="space-y-5">
+      <Account />
       <Title>Trips</Title>
       {trips.length === 0 && !adding && <Sub>Plan your first trip. Each day gets its own walkable zone on the map.</Sub>}
       <div>

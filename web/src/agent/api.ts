@@ -1,3 +1,5 @@
+import { authHeaders } from '../auth'
+
 export interface Step {
   agent: string
   text: string
@@ -8,7 +10,7 @@ export interface Step {
 export async function runStage<T>(stage: 'outline' | 'fill' | 'travel', body: unknown, onStep: (s: Step) => void, signal?: AbortSignal): Promise<T> {
   const r = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/${stage}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
     signal,
   }).catch((e: Error) => {
