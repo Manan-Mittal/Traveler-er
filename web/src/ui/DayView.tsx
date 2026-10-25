@@ -3,6 +3,7 @@ import type { Day } from '../types'
 import type { DayGeo } from '../useDayGeo'
 import Search from './Search'
 import Assistant from './Assistant'
+import { TRANSIT_BUFFER_MIN } from '../services/transit'
 import { Btn, Row, Sub, icon } from './kit'
 
 const WALK_CHOICES = [15, 30, 45, 60] as const
@@ -70,6 +71,12 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
               {i > 0 && (
                 <div className="ml-4 border-l-2 border-dashed border-[var(--line)] py-1.5 pl-5 text-[12px] text-[var(--text-2)]">
                   {geo.legs[i - 1] ? `🚶 ${geo.legs[i - 1]!.minutes} min · ${geo.legs[i - 1]!.km} km` : '🚶 …'}
+                  {geo.transit[i - 1] && (
+                    <span className="ml-3">
+                      🚆 ~{geo.transit[i - 1]!.minutes + TRANSIT_BUFFER_MIN} min
+                      {geo.transit[i - 1]!.transfers > 0 && ` · ${geo.transit[i - 1]!.transfers} change${geo.transit[i - 1]!.transfers > 1 ? 's' : ''}`}
+                    </span>
+                  )}
                 </div>
               )}
               <Row>
