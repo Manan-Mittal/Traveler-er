@@ -3,6 +3,7 @@ import type { Day, Stop, Trip, Zone } from '../types'
 import type { DayGeo, Link } from '../useDayGeo'
 import Search from './Search'
 import Assistant from './Assistant'
+import { modeLabel } from '../services/transit'
 import { Row, Sub, icon } from './kit'
 
 const WALK_CHOICES = [15, 30, 45, 60] as const
@@ -41,6 +42,19 @@ function LinkPill({ tripId, dayId, zone, from, link, fromColor, toColor }: { tri
         <Sub>
           {from.name} → {zone.name}
         </Sub>
+        {link && link !== 'none' && link.legs && link.legs.length > 0 && (
+          <ol className="mt-2 space-y-1.5" aria-label="Transit steps">
+            {link.legs.map((l, i) => (
+              <li key={i} className="flex gap-2 text-[13px]">
+                <span aria-hidden className="w-4 shrink-0 text-center">{l.mode === 'WALK' ? '🚶' : l.mode === 'FERRY' ? '⛴️' : l.mode.includes('RAIL') || l.mode === 'SUBWAY' || l.mode === 'METRO' || l.mode === 'TRAM' ? '🚆' : '🚌'}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{l.mode === 'WALK' ? 'Walk' : `${modeLabel(l.mode)}${l.line ? ` · ${l.line}` : ''}`}</span>
+                  <span className="text-[var(--text-2)]"> · {l.minutes} min{l.mode !== 'WALK' && l.from && l.to ? ` · ${l.from} → ${l.to}` : ''}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
         <div className="mt-2">
           <Seg
             label={`How to get to ${zone.name}`}
