@@ -47,3 +47,25 @@ body { background: var(--bg); color: var(--text); overscroll-behavior: none; }
   box-shadow: var(--shadow);
   border-radius: var(--radius);
 }
+
+.date-pop {
+  background: var(--surface-solid);
+  --rdp-accent-color: var(--accent);
+  --rdp-accent-background-color: var(--accent-soft);
+  --rdp-range_middle-background-color: var(--accent-soft);
+  --rdp-range_middle-color: var(--text);
+  --rdp-day_button-border-radius: 50%;
+  --rdp-selected-border: 0;
+  --rdp-day-height: 38px;
+  --rdp-day-width: 38px;
+  --rdp-day_button-height: 36px;
+  --rdp-day_button-width: 36px;
+  color: var(--text);
+  font-size: 14px;
+}
+.date-pop .rdp-root { --rdp-nav_button-width: 32px; --rdp-nav_button-height: 32px; }
+.date-pop .rdp-caption_label { font-weight: 600; font-size: 15px; }
+.date-pop .rdp-weekday { color: var(--text-2); font-weight: 500; font-size: 12px; }
+.date-pop .rdp-chevron { fill: var(--accent); }
+.date-pop .rdp-today:not(.rdp-selected) .rdp-day_button { color: var(--accent); font-weight: 700; }
+@media (max-width: 480px) { .date-pop { left: 50%; transform: translateX(-50%); } }

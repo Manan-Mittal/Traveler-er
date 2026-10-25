@@ -1,0 +1,76 @@
+import { useEffect, useRef, useState } from 'react'
+import { DayPicker, type DateRange } from 'react-day-picker'
+import { format, parseISO } from 'date-fns'
+import 'react-day-picker/style.css'
+
+const iso = (d: Date) => format(d, 'yyyy-MM-dd')
+const label = (s: string) => format(parseISO(s), 'MMM d, yyyy')
+
+function Popover({ text, placeholder, align = 'left', children }: { text: string; placeholder: string; align?: 'left' | 'right'; children: (close: () => void) => React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  return (
+    <div ref={box} className="relative min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full rounded-xl bg-[var(--accent-soft)] px-3.5 py-2.5 text-left text-[15px] ${text ? '' : 'text-[var(--text-2)]'}`}
+      >
+        {text || placeholder}
+      </button>
+      {open && <div className={`date-pop glass absolute top-full z-20 mt-2 p-3 ${align === 'right' ? 'right-0' : 'left-0'}`}>{children(() => setOpen(false))}</div>}
+    </div>
+  )
+}
+
+export function DateRangePicker({ start, end, onChange }: { start: string; end: string; onChange: (start: string, end: string) => void }) {
+  const selected: DateRange | undefined = start ? { from: parseISO(start), to: end ? parseISO(end) : undefined } : undefined
+  return (
+    <Popover text={start && end ? `${label(start)} → ${label(end)}` : start ? `${label(start)} → pick end` : ''} placeholder="Choose trip dates">
+      {(close) => (
+        <DayPicker
+          mode="range"
+          numberOfMonths={1}
+          selected={selected}
+          defaultMonth={selected?.from}
+          onSelect={(r) => {
+            if (!r?.from) return onChange('', '')
+            onChange(iso(r.from), r.to ? iso(r.to) : '')
+            if (r.to && r.to > r.from) close()
+          }}
+        />
+      )}
+    </Popover>
+  )
+}
+
+export function DatePicker({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <Popover text={value ? label(value) : ''} placeholder={placeholder} align="right">
+      {(close) => (
+        <DayPicker
+          mode="single"
+          selected={value ? parseISO(value) : undefined}
+          defaultMonth={value ? parseISO(value) : undefined}
+          onSelect={(d) => {
+            onChange(d ? iso(d) : '')
+            close()
+          }}
+        />
+      )}
+    </Popover>
+  )
+}
