@@ -9,11 +9,19 @@ const label = (s: string) => format(parseISO(s), 'MMM d, yyyy')
 function Popover({ text, placeholder, align = 'left', children }: { text: string; placeholder: string; align?: 'left' | 'right'; children: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
+    pop.current?.scrollIntoView({ block: 'nearest' })
+    pop.current?.focus({ preventScroll: true })
     const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      trigger.current?.focus()
+    }
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', esc)
     return () => {
@@ -25,13 +33,16 @@ function Popover({ text, placeholder, align = 'left', children }: { text: string
   return (
     <div ref={box} className="relative min-w-0 flex-1">
       <button
+        ref={trigger}
         type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={`w-full rounded-xl bg-[var(--accent-soft)] px-3.5 py-2.5 text-left text-[15px] ${text ? '' : 'text-[var(--text-2)]'}`}
       >
         {text || placeholder}
       </button>
-      {open && <div className={`date-pop glass absolute top-full z-20 mt-2 p-3 ${align === 'right' ? 'right-0' : 'left-0'}`}>{children(() => setOpen(false))}</div>}
+      {open && <div ref={pop} role="dialog" aria-label={placeholder} tabIndex={-1} className={`date-pop glass absolute top-full z-20 mt-2 p-3 ${align === 'right' ? 'right-0' : 'left-0'}`}>{children(() => setOpen(false))}</div>}
     </div>
   )
 }
