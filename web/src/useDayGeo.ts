@@ -13,7 +13,7 @@ export interface ZoneGeo {
 }
 
 /** The hop from the previous zone into this one. `null` while loading, `'none'` when no route was found. */
-export type Link = { mode: 'transit' | 'drive'; minutes: number; km?: number; transfers?: number; shape?: [number, number][] } | 'none' | null
+export type Link = { mode: 'transit' | 'drive'; estimate?: boolean; minutes: number; km?: number; transfers?: number; shape?: [number, number][] } | 'none' | null
 
 export interface DayGeo {
   zones: ZoneGeo[]
@@ -67,7 +67,12 @@ export function useDayGeo(day: Day | undefined): DayGeo {
           .catch(() => put(z.id, 'none'))
       } else {
         transitMinutes(from, z, day.date)
-          .then((t) => put(z.id, t ? { mode, minutes: t.minutes + TRANSIT_BUFFER_MIN, transfers: t.transfers } : 'none'))
+          .then(async (t) => {
+            if (t) return put(z.id, { mode, minutes: t.minutes + TRANSIT_BUFFER_MIN, transfers: t.transfers })
+            // No timetable found: show a rough estimate from the driving time so the day still adds up.
+            const d = await driveLeg(from, z, ctl.signal).catch(() => null)
+            put(z.id, d ? { mode, estimate: true, minutes: Math.round(d.minutes * 1.6) + TRANSIT_BUFFER_MIN, km: d.km } : 'none')
+          })
           .catch(() => put(z.id, 'none'))
       }
     })

@@ -28,6 +28,7 @@ function LinkPill({ tripId, dayId, zone, from, link, fromColor, toColor }: { tri
   if (link === null) text = 'Finding the best way…'
   else if (link === 'none') text = mode === 'transit' ? 'No transit route found. Try driving.' : 'No driving route found.'
   else if (link.mode === 'drive') text = `${link.minutes} min drive${link.km != null ? ` · ${link.km} km` : ''}`
+  else if (link.estimate) text = `About ${link.minutes} min by transit (estimate)`
   else text = `${link.minutes} min by transit${link.transfers ? ` · ${link.transfers} change${link.transfers > 1 ? 's' : ''}` : ''}`
   return (
     <div className="flex gap-3 py-1">

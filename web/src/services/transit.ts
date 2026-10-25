@@ -18,6 +18,26 @@ export async function transitMinutes(
   b: { lat: number; lon: number },
   date: string,
 ): Promise<{ minutes: number; transfers: number } | null> {
+  const first = await lookup(a, b, date)
+  if (first) return first
+  // Timetables usually don't reach months ahead, so retry on the same weekday within the coming week; schedules repeat weekly.
+  const soon = sameWeekdayAhead(date)
+  return soon && soon !== date ? lookup(a, b, soon) : null
+}
+
+function sameWeekdayAhead(date: string): string | null {
+  const t = Date.parse(`${date}T00:00:00Z`)
+  if (Number.isNaN(t)) return null
+  const today = Math.floor(Date.now() / 86400_000) * 86400_000
+  const diff = (((t - today) / 86400_000) % 7 + 7) % 7
+  return new Date(today + (diff || 7) * 86400_000).toISOString().slice(0, 10)
+}
+
+async function lookup(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+  date: string,
+): Promise<{ minutes: number; transfers: number } | null> {
   // 10:00 local at the origin. Longitude gives the zone to within an hour, which is plenty for a transit estimate.
   const time = new Date(Date.parse(`${date}T10:00:00Z`) - Math.round(a.lon / 15) * 3600_000).toISOString()
   const params = new URLSearchParams({
