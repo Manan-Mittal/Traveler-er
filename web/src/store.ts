@@ -171,6 +171,14 @@ export const actions = {
   setDayCity(tripId: string, dayId: string, cityId: string | undefined) {
     updateTrip(tripId, (t) => ({ ...t, days: t.days.map((d) => (d.id === dayId ? { ...d, cityId } : d)) }))
   },
+  /** Gives each day a city, in order, as evenly as possible (for example 10 days over 3 cities is 4, 3, 3). */
+  splitDaysAcrossCities(tripId: string) {
+    updateTrip(tripId, (t) => {
+      const n = t.cities.length
+      if (n === 0) return t
+      return { ...t, days: t.days.map((d, i) => ({ ...d, cityId: t.cities[Math.min(n - 1, Math.floor((i * n) / t.days.length))].id })) }
+    })
+  },
   addZone(tripId: string, dayId: string, zone: Omit<Zone, 'id'>) {
     updateTrip(tripId, (t) => ({
       ...t,
