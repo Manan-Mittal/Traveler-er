@@ -8,7 +8,9 @@ import Bookings from './ui/Bookings'
 import Cities from './ui/Cities'
 import Inbox from './ui/Inbox'
 import Planner from './ui/Planner'
-import type { MapLink } from './MapView'
+import Visited from './ui/Visited'
+import { useWorld } from './useWorld'
+import type { MapLink, WorldLayer } from './MapView'
 import { zoneColor } from './zones'
 import { Btn, Sub, Title, Segmented } from './ui/kit'
 import { formatDay, formatRange } from './format'
@@ -27,6 +29,15 @@ export default function App() {
   const [sheet, setSheet] = useState(1)
   const drag = useRef<number | null>(null)
   const nudge = (dir: number) => setSheet((i) => Math.max(0, Math.min(SHEET_STOPS.length - 1, i + dir)))
+  const [showWorld, setShowWorld] = useState(false)
+  const world = useWorld(showWorld && !trip)
+  const { data: worldData, summary, toggle } = world
+  const worldLayer = useMemo<WorldLayer | undefined>(
+    () => (showWorld && !trip && worldData && summary ? { countries: worldData.fc, visited: new Set(summary.countries.keys()), cities: summary.cities, onToggle: toggle } : undefined),
+    // toggle is rebuilt each render but only reads summary, which is already a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showWorld, trip, worldData, summary],
+  )
 
   const route = useMemo(() => geo.legs.flatMap((l) => (l ? [l.shape] : [])), [geo.legs])
   const links = useMemo<MapLink[]>(() => {
@@ -41,7 +52,7 @@ export default function App() {
   const center = day?.zones[0] ?? city
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <MapView key={dark ? 'dark' : 'light'} sheetTop={SHEET_STOPS[Math.min(sheet, 1)]} stops={geo.stops} zones={geo.zones} route={route} links={links} center={center} inZone={geo.inZone} colorOf={geo.colorOf} />
+      <MapView key={dark ? 'dark' : 'light'} sheetTop={SHEET_STOPS[Math.min(sheet, 1)]} stops={geo.stops} zones={geo.zones} route={route} links={links} center={center} inZone={geo.inZone} colorOf={geo.colorOf} world={worldLayer} />
       <button
         onClick={() => setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system')}
         aria-label={`Appearance: ${theme === 'system' ? 'automatic' : theme}. Tap to change.`}
@@ -68,7 +79,11 @@ export default function App() {
           <span className="mx-auto block h-1.5 w-10 rounded-full bg-[var(--line)] ring-1 ring-[var(--text-2)]/30" />
         </button>
         {!trip ? (
-          <TripList trips={trips} />
+          showWorld ? (
+            <Visited world={world} onClose={() => setShowWorld(false)} />
+          ) : (
+            <TripList trips={trips} onWorld={() => setShowWorld(true)} />
+          )
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
