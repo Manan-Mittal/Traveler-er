@@ -71,7 +71,7 @@ export function useDayGeo(day: Day | undefined): DayGeo {
             if (t) return put(z.id, { mode, minutes: t.minutes + TRANSIT_BUFFER_MIN, transfers: t.transfers, legs: t.legs, shape: t.shape.length > 1 ? t.shape : undefined })
             // No timetable found: show a rough estimate from the driving time so the day still adds up.
             const d = await driveLeg(from, z, ctl.signal).catch(() => null)
-            put(z.id, d ? { mode, estimate: true, minutes: Math.round(d.minutes * 1.6) + TRANSIT_BUFFER_MIN, km: d.km } : 'none')
+            put(z.id, d ? { mode, estimate: true, minutes: Math.round(d.minutes * (d.km > 30 ? 1 : 1.6)) + TRANSIT_BUFFER_MIN, km: d.km } : 'none')
           })
           .catch(() => put(z.id, 'none'))
       }
@@ -98,11 +98,18 @@ export function useDayGeo(day: Day | undefined): DayGeo {
     return () => ctl.abort()
   }, [legKey])
 
-  const zoneGeos: ZoneGeo[] = zones.map((z, i) => ({ zone: z, color: zoneColor(i), polygon: polys[z.id]?.polygon ?? null, error: polys[z.id]?.error ?? '' }))
-  const inZone = (s: Stop) => {
-    const g = zoneGeos.find((x) => x.zone.id === zoneOf(s))
-    return g?.polygon ? inPolygon(s.lon, s.lat, g.polygon.geometry) : null
-  }
+  const zoneGeos: ZoneGeo[] = useMemo(
+    () => zones.map((z, i) => ({ zone: z, color: zoneColor(i), polygon: polys[z.id]?.polygon ?? null, error: polys[z.id]?.error ?? '' })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(zones), polys],
+  )
+  const inZone = useMemo(
+    () => (s: Stop) => {
+      const g = zoneGeos.find((x) => x.zone.id === zoneOf(s))
+      return g?.polygon ? inPolygon(s.lon, s.lat, g.polygon.geometry) : null
+    },
+    [zoneGeos, zoneOf],
+  )
   return {
     zones: zoneGeos,
     stops,

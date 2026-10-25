@@ -113,7 +113,7 @@ function ZoneCard({ trip, day, geo, index }: { trip: Trip; day: Day; geo: DayGeo
             <button className="h-11 w-11 rounded-lg pointer-fine:h-8 pointer-fine:w-8 text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${zone.name} later`} disabled={index === day.zones.length - 1} onClick={() => actions.moveZone(trip.id, day.id, index, index + 1)}>↓</button>
           </>
         )}
-        <button className="h-11 w-11 rounded-lg pointer-fine:h-8 pointer-fine:w-8 text-[var(--text-2)]" aria-label={`Remove area ${zone.name}`} onClick={() => actions.removeZone(trip.id, day.id, zone.id)}>✕</button>
+        <button className="h-11 w-11 rounded-lg pointer-fine:h-8 pointer-fine:w-8 text-[var(--text-2)]" aria-label={`Remove area ${zone.name}`} onClick={() => { const n = day.stops.filter((s) => s.zoneId === zone.id).length; if (!n || confirm(`Remove ${zone.name} and its ${n} stop${n > 1 ? 's' : ''}?`)) actions.removeZone(trip.id, day.id, zone.id) }}>✕</button>
       </div>
       <div className="mt-3">
         <Seg
