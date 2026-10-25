@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { actions } from '../store'
 import type { Trip } from '../types'
 import { Btn, Input, Row, Sub, Title } from './kit'
+import { DateRangePicker } from './DatePicker'
 
 export default function TripList({ trips }: { trips: Trip[] }) {
   const [adding, setAdding] = useState(false)
@@ -32,10 +33,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
       {adding ? (
         <div className="space-y-2">
           <Input autoFocus placeholder="Trip name, e.g. Taiwan" value={name} onChange={(e) => setName(e.target.value)} />
-          <div className="flex gap-2">
-            <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-            <Input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} />
-          </div>
+          <DateRangePicker start={start} end={end} onChange={(a, b) => (setStart(a), setEnd(b))} />
           <div className="flex gap-2">
             <Btn kind="primary" disabled={!valid} onClick={() => (actions.createTrip(name.trim(), start, end), setAdding(false))}>
               Create trip
