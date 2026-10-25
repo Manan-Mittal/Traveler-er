@@ -26,10 +26,10 @@ export default function App() {
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Btn kind="ghost" className="-ml-3" onClick={() => actions.openTrip(null)}>
+              <Btn kind="ghost" className="-ml-3" onClick={() => (setTab('days'), actions.openTrip(null))}>
                 ‹ Trips
               </Btn>
-              <Btn kind="ghost" onClick={() => confirm(`Delete ${trip.name}?`) && actions.deleteTrip(trip.id)}>
+              <Btn kind="ghost" onClick={() => confirm(`Delete ${trip.name}?`) && (setTab('days'), actions.deleteTrip(trip.id))}>
                 Delete
               </Btn>
             </div>

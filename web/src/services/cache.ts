@@ -1,10 +1,22 @@
 const mem = new Map<string, { at: number; value: unknown }>()
-const last = new Map<string, number>()
+const queues = new Map<string, Promise<void>>()
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** Wait for this host's turn; a request aborted while queued gives its turn straight to the next one. */
+async function throttle(host: string, gapMs: number, signal?: AbortSignal) {
+  const prev = queues.get(host) ?? Promise.resolve()
+  let release!: () => void
+  const mine = new Promise<void>((r) => (release = r))
+  queues.set(host, prev.then(() => mine))
+  await prev
+  if (signal?.aborted) {
+    release()
+    throw new DOMException('Aborted', 'AbortError')
+  }
+  setTimeout(release, gapMs)
+}
 
 /** Cache JSON results in memory and localStorage; space out calls per host so public servers aren't hammered. */
-export async function cachedJson<T>(key: string, ttlMs: number, run: () => Promise<T>, host = '', gapMs = 0): Promise<T> {
+export async function cachedJson<T>(key: string, ttlMs: number, run: () => Promise<T>, host = '', gapMs = 0, signal?: AbortSignal): Promise<T> {
   const now = Date.now()
   const hit = mem.get(key)
   if (hit && now - hit.at < ttlMs) return hit.value as T
@@ -20,11 +32,7 @@ export async function cachedJson<T>(key: string, ttlMs: number, run: () => Promi
   } catch {
     // ignore unreadable cache
   }
-  if (host && gapMs) {
-    const wait = (last.get(host) ?? 0) + gapMs - Date.now()
-    last.set(host, Math.max(Date.now(), (last.get(host) ?? 0) + gapMs))
-    if (wait > 0) await sleep(wait)
-  }
+  if (host && gapMs) await throttle(host, gapMs, signal)
   const value = await run()
   const entry = { at: Date.now(), value }
   mem.set(key, entry)

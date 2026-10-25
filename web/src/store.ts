@@ -11,10 +11,46 @@ interface State {
 
 const uid = () => crypto.randomUUID()
 
+const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
+const str = (x: unknown, fallback = '') => (typeof x === 'string' ? x : fallback)
+const isDate = (x: unknown): x is string => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) && !isNaN(Date.parse(x))
+const httpUrl = (x: unknown) => (typeof x === 'string' && /^https?:\/\//i.test(x.trim()) ? x.trim() : undefined)
+
+/** Coerce untrusted JSON (old saves, import files) into a valid trip, or null if it isn't one. */
+const cleanTrip = (x: unknown): Trip | null => {
+  if (!isObj(x) || typeof x.id !== 'string' || !x.id || !isDate(x.startDate) || !isDate(x.endDate)) return null
+  const days = (Array.isArray(x.days) ? x.days : []).filter(isObj).filter((d) => isDate(d.date)).map(
+    (d): Day => ({
+      ...(d as unknown as Day),
+      id: str(d.id) || uid(),
+      title: str(d.title),
+      notes: str(d.notes),
+      stops: (Array.isArray(d.stops) ? d.stops : []).filter(
+        (s): s is Stop => isObj(s) && typeof s.lat === 'number' && typeof s.lon === 'number' && typeof s.name === 'string',
+      ).map((s) => ({ ...s, id: str(s.id) || uid() })),
+    }),
+  )
+  const bookings = (Array.isArray(x.bookings) ? x.bookings : []).filter(isObj).map(
+    (b): Booking => ({ ...(b as unknown as Booking), id: str(b.id) || uid(), title: str(b.title), deadline: isDate(b.deadline) ? b.deadline : undefined, status: b.status === 'booked' ? 'booked' : 'todo', url: httpUrl(b.url) }),
+  )
+  return { ...(x as unknown as Trip), name: str(x.name, 'Untitled trip'), days, bookings }
+}
+
+const cleanTrips = (list: unknown[]): Trip[] => {
+  const seen = new Set<string>()
+  return list.map(cleanTrip).filter((t): t is Trip => !!t && !seen.has(t.id) && !!seen.add(t.id))
+}
+
 const load = (): State => {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as State
+    const data: unknown = raw ? JSON.parse(raw) : null
+    if (isObj(data) && Array.isArray(data.trips)) {
+      const trips = cleanTrips(data.trips)
+      const tripId = trips.some((t) => t.id === data.tripId) ? (data.tripId as string) : null
+      const dayId = typeof data.dayId === 'string' ? data.dayId : null
+      return { trips, tripId, dayId: tripId ? dayId : null }
+    }
   } catch {
     // fall through to empty state
   }
@@ -47,7 +83,7 @@ const dayList = (start: string, end: string): string[] => {
   const out: string[] = []
   const d = new Date(start + 'T00:00:00Z')
   const last = new Date(end + 'T00:00:00Z')
-  while (d <= last && out.length < 60) {
+  while (d <= last && out.length < 366) {
     out.push(d.toISOString().slice(0, 10))
     d.setUTCDate(d.getUTCDate() + 1)
   }
@@ -61,11 +97,14 @@ export const actions = {
   exportAll(): string {
     return JSON.stringify({ app: 'traveler-er', version: 1, trips: state.trips }, null, 2)
   },
-  importAll(text: string) {
-    const data = JSON.parse(text) as { app?: string; trips?: Trip[] }
-    if (data.app !== 'traveler-er' || !Array.isArray(data.trips)) throw new Error('Not a Traveler-er export file')
+  /** Adds trips from an export file, skipping ones already here. Returns how many were added and skipped. */
+  importAll(text: string): { added: number; skipped: number } {
+    const data: unknown = JSON.parse(text)
+    if (!isObj(data) || data.app !== 'traveler-er' || !Array.isArray(data.trips)) throw new Error('Not a Traveler-er export file')
     const have = new Set(state.trips.map((t) => t.id))
-    set({ ...state, trips: [...data.trips.filter((t) => !have.has(t.id)), ...state.trips] })
+    const fresh = cleanTrips(data.trips).filter((t) => !have.has(t.id))
+    set({ ...state, trips: [...fresh, ...state.trips] })
+    return { added: fresh.length, skipped: data.trips.length - fresh.length }
   },
   createTrip(name: string, startDate: string, endDate: string) {
     const days: Day[] = dayList(startDate, endDate).map((date, i) => ({

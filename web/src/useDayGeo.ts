@@ -8,7 +8,8 @@ export interface DayGeo {
   zone: GeoJSON.Feature<GeoJSON.Polygon> | null
   legs: (Leg | null)[]
   transit: ({ minutes: number; transfers: number } | null)[]
-  error: string
+  zoneError: string
+  routeError: string
   inZone: (s: { lat: number; lon: number }) => boolean | null
 }
 
@@ -17,19 +18,19 @@ export function useDayGeo(day: Day | undefined): DayGeo {
   const [zone, setZone] = useState<DayGeo['zone']>(null)
   const [legs, setLegs] = useState<(Leg | null)[]>([])
   const [transit, setTransit] = useState<DayGeo['transit']>([])
-  const [error, setError] = useState('')
+  const [zoneError, setZoneError] = useState('')
+  const [routeError, setRouteError] = useState('')
 
   const z = day?.zone
   useEffect(() => {
     setZone(null)
+    setZoneError('')
     if (!z) return
-    let stale = false
-    walkZone(z.lat, z.lon, z.walkMinutes)
-      .then((f) => !stale && setZone(f))
-      .catch((e: Error) => !stale && setError(e.message))
-    return () => {
-      stale = true
-    }
+    const ctl = new AbortController()
+    walkZone(z.lat, z.lon, z.walkMinutes, ctl.signal)
+      .then((f) => !ctl.signal.aborted && setZone(f))
+      .catch((e: Error) => !ctl.signal.aborted && setZoneError(e.message))
+    return () => ctl.abort()
   }, [z?.lat, z?.lon, z?.walkMinutes])
 
   const key = day?.stops.map((s) => s.id).join(',') ?? ''
@@ -37,24 +38,24 @@ export function useDayGeo(day: Day | undefined): DayGeo {
     const stops = day?.stops ?? []
     setLegs(stops.slice(1).map(() => null))
     setTransit(stops.slice(1).map(() => null))
-    let stale = false
+    setRouteError('')
+    const ctl = new AbortController()
+    const stale = () => ctl.signal.aborted
     stops.slice(1).forEach((s, i) => {
-      walkLeg(stops[i], s)
+      walkLeg(stops[i], s, ctl.signal)
         .then((l) => {
-          if (stale) return
+          if (stale()) return
           setLegs((prev) => prev.map((p, j) => (j === i ? l : p)))
           // Only worth asking about transit when the walk is long.
           if (l.minutes > 25 && day) {
-            transitMinutes(stops[i], s, day.date).then((t) => !stale && setTransit((prev) => prev.map((p, j) => (j === i ? t : p))))
+            transitMinutes(stops[i], s, day.date).then((t) => !stale() && setTransit((prev) => prev.map((p, j) => (j === i ? t : p))))
           }
         })
-        .catch((e: Error) => !stale && setError(e.message))
+        .catch((e: Error) => !stale() && setRouteError(e.message))
     })
-    return () => {
-      stale = true
-    }
+    return () => ctl.abort()
   }, [key])
 
   const inZone = useMemo(() => (s: { lat: number; lon: number }) => (zone ? inPolygon(s.lon, s.lat, zone.geometry) : null), [zone])
-  return { zone, legs, transit, error, inZone }
+  return { zone, legs, transit, zoneError, routeError, inZone }
 }
