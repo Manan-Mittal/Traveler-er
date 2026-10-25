@@ -50,17 +50,19 @@ function Popover({ text, placeholder, align = 'left', children }: { text: string
 export function DateRangePicker({ start, end, onChange }: { start: string; end: string; onChange: (start: string, end: string) => void }) {
   const selected: DateRange | undefined = start ? { from: parseISO(start), to: end ? parseISO(end) : undefined } : undefined
   return (
-    <Popover text={start && end ? `${label(start)} → ${label(end)}` : start ? `${label(start)} → pick end` : ''} placeholder="Choose trip dates">
+    <Popover text={start && end ? (start === end ? label(start) : `${label(start)} → ${label(end)}`) : start ? `${label(start)} → pick end` : ''} placeholder="Choose trip dates">
       {(close) => (
         <DayPicker
           mode="range"
           numberOfMonths={1}
           selected={selected}
           defaultMonth={selected?.from}
-          onSelect={(r) => {
-            if (!r?.from) return onChange('', '')
-            onChange(iso(r.from), r.to ? iso(r.to) : '')
-            if (r.to && r.to > r.from) close()
+          onDayClick={(day) => {
+            const d = iso(day)
+            // First click sets the start; the next click sets the end (the same day makes a one-day trip).
+            if (!start || end || d < start) return onChange(d, '')
+            onChange(start, d)
+            close()
           }}
         />
       )}
