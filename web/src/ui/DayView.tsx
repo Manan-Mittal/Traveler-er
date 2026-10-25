@@ -2,6 +2,7 @@ import { actions } from '../store'
 import type { Day } from '../types'
 import type { DayGeo } from '../useDayGeo'
 import Search from './Search'
+import Assistant from './Assistant'
 import { Btn, Row, Sub, icon } from './kit'
 
 const WALK_CHOICES = [15, 30, 45, 60] as const
@@ -56,6 +57,8 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
           />
         )}
       </section>
+
+      <Assistant tripId={tripId} day={day} />
 
       <section className="space-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]">
