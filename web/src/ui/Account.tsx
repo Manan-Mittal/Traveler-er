@@ -21,7 +21,8 @@ export default function Account() {
     return (
       <div className="space-y-2 rounded-2xl bg-[var(--accent-soft)] p-3">
         <Sub>Sign in to save trips to your account, open them on any device, and use the assistant. Trips already in this browser come with you.</Sub>
-        <div ref={button} className="min-h-[44px]" />
+        {/* Google draws the button in an iframe; a light color-scheme stops it getting a white box in dark mode. */}
+        <div ref={button} className="min-h-[44px]" style={{ colorScheme: "light" }} />
         {error && <p className="text-[12px] text-[var(--danger)]">{error}</p>}
       </div>
     )
