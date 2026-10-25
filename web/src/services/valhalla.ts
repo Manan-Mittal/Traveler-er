@@ -56,16 +56,21 @@ function decode(str: string): LngLat[] {
   return out
 }
 
-export async function walkLeg(a: { lat: number; lon: number }, b: { lat: number; lon: number }, signal?: AbortSignal): Promise<Leg> {
+export type Costing = 'pedestrian' | 'auto'
+
+export const walkLeg = (a: { lat: number; lon: number }, b: { lat: number; lon: number }, signal?: AbortSignal) => routeLeg(a, b, 'pedestrian', signal)
+export const driveLeg = (a: { lat: number; lon: number }, b: { lat: number; lon: number }, signal?: AbortSignal) => routeLeg(a, b, 'auto', signal)
+
+async function routeLeg(a: { lat: number; lon: number }, b: { lat: number; lon: number }, costing: Costing, signal?: AbortSignal): Promise<Leg> {
   const json = {
     locations: [
       { lat: a.lat, lon: a.lon },
       { lat: b.lat, lon: b.lon },
     ],
-    costing: 'pedestrian',
+    costing,
   }
   const data = await cachedJson(
-    `walk:${a.lat.toFixed(5)},${a.lon.toFixed(5)}>${b.lat.toFixed(5)},${b.lon.toFixed(5)}`,
+    `${costing === 'auto' ? 'drive' : 'walk'}:${a.lat.toFixed(5)},${a.lon.toFixed(5)}>${b.lat.toFixed(5)},${b.lon.toFixed(5)}`,
     30 * 24 * 3600 * 1000,
     async () => {
       const r = await fetch(`${BASE}/route?json=${encodeURIComponent(JSON.stringify(json))}`, { signal })
