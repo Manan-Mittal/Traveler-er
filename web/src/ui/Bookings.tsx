@@ -3,6 +3,7 @@ import { actions } from '../store'
 import type { BookingKind, Trip } from '../types'
 import { Btn, Input, Row, Sub } from './kit'
 import { DatePicker } from './DatePicker'
+import { suggestBookings } from '../suggestions'
 
 const KINDS: BookingKind[] = ['flight', 'train', 'lodging', 'ticket', 'restaurant', 'other']
 const emoji: Record<BookingKind, string> = { flight: '✈️', train: '🚆', lodging: '🛏️', ticket: '🎟️', restaurant: '🍽️', other: '📌' }
@@ -12,6 +13,7 @@ export default function Bookings({ trip }: { trip: Trip }) {
   const [kind, setKind] = useState<BookingKind>('ticket')
   const [deadline, setDeadline] = useState('')
   const [url, setUrl] = useState('')
+  const suggestions = suggestBookings(trip).slice(0, 8)
   const sorted = [...trip.bookings].sort((a, b) => Number(a.status === 'booked') - Number(b.status === 'booked') || (a.deadline ?? '9').localeCompare(b.deadline ?? '9'))
 
   return (
@@ -41,6 +43,28 @@ export default function Bookings({ trip }: { trip: Trip }) {
           </Row>
         ))}
       </div>
+      {suggestions.length > 0 && (
+        <div className="space-y-1 rounded-xl bg-[var(--accent-soft)] p-3">
+          <div className="text-[13px] font-semibold">Worth booking</div>
+          {suggestions.map((g) => (
+            <div key={g.key} className="flex items-start gap-2 py-1">
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-medium">{g.title}</div>
+                <Sub>
+                  {g.why}
+                  {g.deadline && ` Aim to book by ${g.deadline}.`}
+                </Sub>
+              </div>
+              <Btn
+                className="shrink-0 !px-3 !py-1 text-[13px]"
+                onClick={() => actions.addBooking(trip.id, { title: g.title, kind: g.kind, dayId: g.dayId, deadline: g.deadline, status: 'todo' })}
+              >
+                Add
+              </Btn>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="space-y-2">
         <Input placeholder="What needs booking?" value={title} onChange={(e) => setTitle(e.target.value)} />
         <div className="flex gap-2">
