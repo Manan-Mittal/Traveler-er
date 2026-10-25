@@ -26,9 +26,9 @@ How Traveler-er protects accounts, trips and the API keys, plus the audit done w
 
 | # | Finding | Risk | Fix |
 |---|---|---|---|
-| 1 | The origin check let through any request **without** an `Origin` header, so anyone with curl could call `/api/plan` and spend the OpenRouter free quota. | High | AI and list-import endpoints require sign-in. |
-| 2 | Rate limiting was an in-memory counter per Worker instance, which resets often and differs per instance. | Medium | Per-user hourly quotas stored in D1 (assistant 40/h, list import 30/h, saves 1200/h). The per-IP limiter stays only for the sign-in endpoint. |
-| 3 | Request bodies had no size limit. | Low | Every JSON body is capped (4 KB for planning, 8 KB for sign-in, 1.1 MB for a trip). |
+| 1 | The origin check let through any request **without** an `Origin` header, so anyone with curl could call `/api/plan` and spend the OpenRouter free quota. | High | AI endpoints (assistant and multi-agent planner) and list import require sign-in. |
+| 2 | Rate limiting was an in-memory counter per Worker instance, which resets often and differs per instance. | Medium | Per-user hourly quotas stored in D1 (assistant 40/h, planner stages 60/h, list import 30/h, saves 1200/h). The per-IP limiter stays only for the sign-in endpoint. |
+| 3 | Request bodies had no size limit. | Low | Every JSON body is capped (4 KB for planning, 64 KB for planner stages, 8 KB for sign-in, 1.1 MB for a trip). |
 | 4 | The shared-list import followed every redirect, so a Google open redirect could make the Worker fetch any site. | Low | Redirects are followed one hop at a time and stop as soon as one leaves Google's share hosts. |
 | 5 | No Content Security Policy. | Medium (needed once a token is stored) | The built site has a CSP meta tag: scripts only from the site and Google sign-in, network calls only to the APIs the app uses, no plugins, no `<base>` hijack. |
 | 6 | `fflate` 0.8.2 can loop forever on a malformed ZIP64 Takeout file. | Low | Upgraded to 0.8.3. |

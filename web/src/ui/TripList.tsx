@@ -75,6 +75,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
           >
             Export
           </Btn>
+          <Btn onClick={() => actions.addSampleTrip()}>Try the Taiwan sample</Btn>
           <Btn onClick={() => setImporting(true)}>Import Google Maps lists</Btn>
           <Btn onClick={() => file.current?.click()}>Import</Btn>
           <input

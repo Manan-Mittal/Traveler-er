@@ -3,6 +3,7 @@ import type { Day, Stop, Trip, Zone } from '../types'
 import type { DayGeo, Link } from '../useDayGeo'
 import Search from './Search'
 import Assistant from './Assistant'
+import { modeLabel } from '../services/transit'
 import { Row, Sub, icon } from './kit'
 
 const WALK_CHOICES = [15, 30, 45, 60] as const
@@ -14,7 +15,7 @@ const Seg = <T extends string | number>({ options, value, onChange, label }: { o
         key={String(o.value)}
         aria-pressed={o.value === value}
         onClick={() => onChange(o.value)}
-        className={`flex-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium transition ${o.value === value ? 'bg-[var(--surface-solid)] text-[var(--text)] shadow-sm' : 'text-[var(--text-2)]'}`}
+        className={`flex-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium transition pointer-coarse:py-2.5 ${o.value === value ? 'bg-[var(--surface-solid)] text-[var(--text)] shadow-sm' : 'text-[var(--text-2)]'}`}
       >
         {o.label}
       </button>
@@ -41,6 +42,19 @@ function LinkPill({ tripId, dayId, zone, from, link, fromColor, toColor }: { tri
         <Sub>
           {from.name} → {zone.name}
         </Sub>
+        {link && link !== 'none' && link.legs && link.legs.length > 0 && (
+          <ol className="mt-2 space-y-1.5" aria-label="Transit steps">
+            {link.legs.map((l, i) => (
+              <li key={i} className="flex gap-2 text-[13px]">
+                <span aria-hidden className="w-4 shrink-0 text-center">{l.mode === 'WALK' ? '🚶' : l.mode === 'FERRY' ? '⛴️' : l.mode.includes('RAIL') || l.mode === 'SUBWAY' || l.mode === 'METRO' || l.mode === 'TRAM' ? '🚆' : '🚌'}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{l.mode === 'WALK' ? 'Walk' : `${modeLabel(l.mode)}${l.line ? ` · ${l.line}` : ''}`}</span>
+                  <span className="text-[var(--text-2)]"> · {l.minutes} min{l.mode !== 'WALK' && l.from && l.to ? ` · ${l.from} → ${l.to}` : ''}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
         <div className="mt-2">
           <Seg
             label={`How to get to ${zone.name}`}
@@ -75,9 +89,9 @@ function StopRow({ tripId, day, geo, stop, index, group }: { tripId: string; day
         </div>
         {stop.why && <Sub>{stop.why}</Sub>}
       </div>
-      <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${stop.name} up`} disabled={pos === 0} onClick={() => shift(-1)}>↑</button>
-      <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${stop.name} down`} disabled={pos === group.length - 1} onClick={() => shift(1)}>↓</button>
-      <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)]" aria-label={`Remove ${stop.name}`} onClick={() => actions.removeStop(tripId, day.id, stop.id)}>✕</button>
+      <button className="h-11 w-10 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${stop.name} up`} disabled={pos === 0} onClick={() => shift(-1)}>↑</button>
+      <button className="h-11 w-10 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${stop.name} down`} disabled={pos === group.length - 1} onClick={() => shift(1)}>↓</button>
+      <button className="h-11 w-10 shrink-0 rounded-lg text-[var(--text-2)]" aria-label={`Remove ${stop.name}`} onClick={() => actions.removeStop(tripId, day.id, stop.id)}>✕</button>
     </Row>
   )
 }
@@ -95,11 +109,11 @@ function ZoneCard({ trip, day, geo, index }: { trip: Trip; day: Day; geo: DayGeo
         <h3 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight">{zone.name}</h3>
         {day.zones.length > 1 && (
           <>
-            <button className="h-8 w-8 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${zone.name} earlier`} disabled={index === 0} onClick={() => actions.moveZone(trip.id, day.id, index, index - 1)}>↑</button>
-            <button className="h-8 w-8 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${zone.name} later`} disabled={index === day.zones.length - 1} onClick={() => actions.moveZone(trip.id, day.id, index, index + 1)}>↓</button>
+            <button className="h-11 w-11 rounded-lg pointer-fine:h-8 pointer-fine:w-8 text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${zone.name} earlier`} disabled={index === 0} onClick={() => actions.moveZone(trip.id, day.id, index, index - 1)}>↑</button>
+            <button className="h-11 w-11 rounded-lg pointer-fine:h-8 pointer-fine:w-8 text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${zone.name} later`} disabled={index === day.zones.length - 1} onClick={() => actions.moveZone(trip.id, day.id, index, index + 1)}>↓</button>
           </>
         )}
-        <button className="h-8 w-8 rounded-lg text-[var(--text-2)]" aria-label={`Remove area ${zone.name}`} onClick={() => actions.removeZone(trip.id, day.id, zone.id)}>✕</button>
+        <button className="h-11 w-11 rounded-lg pointer-fine:h-8 pointer-fine:w-8 text-[var(--text-2)]" aria-label={`Remove area ${zone.name}`} onClick={() => actions.removeZone(trip.id, day.id, zone.id)}>✕</button>
       </div>
       <div className="mt-3">
         <Seg
@@ -171,7 +185,7 @@ export default function DayView({ trip, day, geo }: { trip: Trip; day: Day; geo:
               key={c.id}
               aria-pressed={c.id === day.cityId}
               onClick={() => actions.setDayCity(trip.id, day.id, c.id === day.cityId ? undefined : c.id)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium ${c.id === day.cityId ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent)]'}`}
+              className={`shrink-0 rounded-full px-3 py-1.5 pointer-coarse:py-2.5 text-[13px] font-medium ${c.id === day.cityId ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent)]'}`}
             >
               {c.name}
             </button>

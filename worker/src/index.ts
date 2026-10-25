@@ -1,6 +1,7 @@
 import { draftDay, type PlanRequest } from './plan.ts'
 import { freeModels, type Env as AiEnv } from './openrouter.ts'
 import { fetchSharedList } from './gmaps.ts'
+import { agentRoute } from './agents/orchestrator.ts'
 import { HttpError, createSession, endSession, requireUser, verifyGoogleToken } from './auth.ts'
 import { overQuota, type DbEnv } from './db.ts'
 import { deleteTrip, listTrips, putTrip } from './trips.ts'
@@ -104,6 +105,11 @@ export default {
           stopCount: Math.min(Math.max(Number(b.stopCount) || 5, 2), 8),
         })
         return json({ stops })
+      }
+      if (url.pathname.startsWith('/api/agent/') && req.method === 'POST') {
+        if (await overQuota(env, user.id, 'agent', 60)) throw new HttpError(429, 'You’ve used the planner a lot this hour, try again later')
+        const res = await agentRoute(url.pathname.slice('/api/agent/'.length), await body(req, 64_000), env, cors)
+        if (res) return res
       }
       if (url.pathname === '/api/gmaps-list' && req.method === 'GET') {
         if (await overQuota(env, user.id, 'gmaps', 30)) throw new HttpError(429, 'slow down, try again later')

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { Booking, City, Day, Stop, Trip, Zone } from './types'
+import { sampleTrip } from './sample'
 
 const KEY = 'traveler-er:v1'
 
@@ -158,6 +159,11 @@ export const actions = {
     set({ trips: [trip, ...state.trips], tripId: trip.id, dayId: days[0]?.id ?? null })
     return trip.id
   },
+  /** Adds an editable copy of the built-in Taiwan sample trip and opens it. */
+  addSampleTrip() {
+    const trip = sampleTrip()
+    set({ trips: [trip, ...state.trips], tripId: trip.id, dayId: trip.days[0].id })
+  },
   deleteTrip(id: string) {
     set({ trips: state.trips.filter((t) => t.id !== id), tripId: null, dayId: null })
   },
@@ -196,11 +202,14 @@ export const actions = {
       return { ...t, days: t.days.map((d, i) => ({ ...d, cityId: t.cities[Math.min(n - 1, Math.floor((i * n) / t.days.length))].id })) }
     })
   },
-  addZone(tripId: string, dayId: string, zone: Omit<Zone, 'id'>) {
+  /** Returns the new zone's id. */
+  addZone(tripId: string, dayId: string, zone: Omit<Zone, 'id'>): string {
+    const id = uid()
     updateTrip(tripId, (t) => ({
       ...t,
-      days: t.days.map((d) => (d.id === dayId ? { ...d, zones: [...d.zones, { ...zone, id: uid() }] } : d)),
+      days: t.days.map((d) => (d.id === dayId ? { ...d, zones: [...d.zones, { ...zone, id }] } : d)),
     }))
+    return id
   },
   patchZone(tripId: string, dayId: string, zoneId: string, patch: Partial<Omit<Zone, 'id'>>) {
     updateTrip(tripId, (t) => ({

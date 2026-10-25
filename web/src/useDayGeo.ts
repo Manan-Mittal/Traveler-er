@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Day, Stop, Zone } from './types'
 import { driveLeg, walkLeg, walkZone, type Leg } from './services/valhalla'
 import { inPolygon } from './geo'
-import { TRANSIT_BUFFER_MIN, transitMinutes } from './services/transit'
+import { TRANSIT_BUFFER_MIN, transitMinutes, type TransitLeg } from './services/transit'
 import { orderedStops, zoneColor, zoneIdOf } from './zones'
 
 export interface ZoneGeo {
@@ -13,7 +13,7 @@ export interface ZoneGeo {
 }
 
 /** The hop from the previous zone into this one. `null` while loading, `'none'` when no route was found. */
-export type Link = { mode: 'transit' | 'drive'; estimate?: boolean; minutes: number; km?: number; transfers?: number; shape?: [number, number][] } | 'none' | null
+export type Link = { mode: 'transit' | 'drive'; estimate?: boolean; legs?: TransitLeg[]; minutes: number; km?: number; transfers?: number; shape?: [number, number][] } | 'none' | null
 
 export interface DayGeo {
   zones: ZoneGeo[]
@@ -68,7 +68,7 @@ export function useDayGeo(day: Day | undefined): DayGeo {
       } else {
         transitMinutes(from, z, day.date)
           .then(async (t) => {
-            if (t) return put(z.id, { mode, minutes: t.minutes + TRANSIT_BUFFER_MIN, transfers: t.transfers })
+            if (t) return put(z.id, { mode, minutes: t.minutes + TRANSIT_BUFFER_MIN, transfers: t.transfers, legs: t.legs, shape: t.shape.length > 1 ? t.shape : undefined })
             // No timetable found: show a rough estimate from the driving time so the day still adds up.
             const d = await driveLeg(from, z, ctl.signal).catch(() => null)
             put(z.id, d ? { mode, estimate: true, minutes: Math.round(d.minutes * 1.6) + TRANSIT_BUFFER_MIN, km: d.km } : 'none')

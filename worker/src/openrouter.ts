@@ -32,7 +32,7 @@ export async function freeModels(env: Env): Promise<string[]> {
 }
 
 /** Ask a free model for JSON, trying the next one when a model is rate limited or returns garbage. */
-export async function askJson<T>(env: Env, system: string, user: string, tries = 4): Promise<T> {
+export async function askJson<T>(env: Env, system: string, user: string, tries = 4, onModel?: (model: string) => void): Promise<T> {
   const models = (await freeModels(env)).filter((m) => m.endsWith(':free')).slice(0, tries)
   let lastError = 'no free models available'
   for (const model of models) {
@@ -60,7 +60,9 @@ export async function askJson<T>(env: Env, system: string, user: string, tries =
         lastError = `${model}: no JSON`
         continue
       }
-      return JSON.parse(match[0]) as T
+      const parsed = JSON.parse(match[0]) as T
+      onModel?.(model)
+      return parsed
     } catch (e) {
       lastError = `${model}: ${(e as Error).message}`
     }
