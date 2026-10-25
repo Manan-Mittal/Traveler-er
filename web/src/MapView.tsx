@@ -4,6 +4,7 @@ import type { Stop } from './types'
 import type { ZoneGeo } from './useDayGeo'
 
 import { isDark } from './theme'
+import { onFocusMap } from './focus'
 
 const style = () => `https://tiles.openfreemap.org/styles/${isDark() ? 'dark' : 'positron'}`
 
@@ -28,7 +29,23 @@ interface Props {
 }
 
 // The idle world map: a dot hops between cities along a dotted trail, then starts over.
-const HOP_CITIES: [number, number][] = [[-122.4, 37.8], [-74, 40.7], [-0.1, 51.5], [55.3, 25.2], [121.5, 25], [139.7, 35.7]]
+const POOL: [number, number][] = [
+  [-122.4, 37.8], [-118.2, 34], [-99.1, 19.4], [-74, 40.7], [-79.4, 43.7], [-43.2, -22.9], [-0.1, 51.5], [2.3, 48.9], [-9.1, 38.7], [12.5, 41.9],
+  [29, 41], [31.2, 30], [55.3, 25.2], [72.9, 19], [100.5, 13.8], [103.8, 1.4], [114.2, 22.3], [121.5, 25], [127, 37.6], [139.7, 35.7],
+]
+const HOP_COUNT = 6
+const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], (a[1] - b[1]) * 1.4)
+const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]
+/** A fresh random trip across the pool: each next stop is one of the few nearest cities that are still a decent hop away. */
+function makeRoute(): [number, number][] {
+  const route = [pick(POOL)]
+  while (route.length < HOP_COUNT) {
+    const here = route.at(-1)!
+    const options = POOL.filter((c) => !route.includes(c) && dist(here, c) > 14).sort((x, y) => dist(here, x) - dist(here, y))
+    route.push(pick(options.slice(0, 4)) ?? pick(POOL.filter((c) => !route.includes(c))))
+  }
+  return route
+}
 const HOP_MS = 1100
 const PAUSE_MS = 450
 const hopArc = (a: [number, number], b: [number, number]): [number, number][] =>
@@ -36,7 +53,7 @@ const hopArc = (a: [number, number], b: [number, number]): [number, number][] =>
     const t = i / 30
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + Math.sin(Math.PI * t) * Math.min(14, Math.abs(b[0] - a[0]) * 0.25)]
   })
-const HOP_LEGS = HOP_CITIES.slice(1).map((c, i) => hopArc(HOP_CITIES[i], c))
+const legsOf = (route: [number, number][]) => route.slice(1).map((c, i) => hopArc(route[i], c))
 const point = (c: [number, number]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })
 const line = (coordinates: [number, number][]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } })
 
@@ -117,9 +134,11 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 4 } })
       m.addSource('hop-line', { type: 'geojson', data: empty })
       m.addSource('hop-city', { type: 'geojson', data: empty })
+      m.addSource('hop-pool', { type: 'geojson', data: { type: 'FeatureCollection', features: POOL.map((c, i) => ({ ...point(c), properties: { g: i % 2 } })) } })
       m.addSource('hop-ping', { type: 'geojson', data: empty })
       const hidden = { visibility: 'none' } as const
       m.addLayer({ id: 'hop-line', type: 'line', source: 'hop-line', layout: { ...hidden, 'line-cap': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 2.5, 'line-dasharray': [0.5, 2.5] } })
+      for (const g of [0, 1]) m.addLayer({ id: `hop-pool-${g}`, type: 'circle', source: 'hop-pool', filter: ['==', ['get', 'g'], g], layout: hidden, paint: { 'circle-radius': 3, 'circle-color': '#0a84ff', 'circle-opacity': 0.35 } })
       m.addLayer({ id: 'hop-ping', type: 'circle', source: 'hop-ping', layout: hidden, paint: { 'circle-radius': 6, 'circle-color': '#0a84ff', 'circle-opacity': 0, 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2, 'circle-stroke-opacity': 0 } })
       m.addLayer({ id: 'hop-city', type: 'circle', source: 'hop-city', layout: hidden, paint: { 'circle-radius': 4, 'circle-color': '#fff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2 } })
       ready.current = true
@@ -135,11 +154,23 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
 
   useEffect(paint, [zones, route, links])
 
+  // Tapping a city chip flies the map there, keeping the target in the part the panel leaves free.
+  useEffect(
+    () =>
+      onFocusMap((t) => {
+        const m = map.current
+        if (!m) return
+        m.setPadding(panelPadding(m.getContainer().clientWidth, m.getContainer().clientHeight, sheetTop))
+        m.flyTo({ center: [t.lon, t.lat], zoom: t.zoom ?? 12, duration: 900 })
+      }),
+    [sheetTop],
+  )
+
   const idle = stops.length === 0 && zones.length === 0 && !center
   useEffect(() => {
     const m = map.current
     if (!m) return
-    const layers = ['hop-line', 'hop-ping', 'hop-city']
+    const layers = ['hop-line', 'hop-ping', 'hop-city', 'hop-pool-0', 'hop-pool-1']
     const show = (v: 'visible' | 'none') => layers.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, 'visibility', v))
     let raf = 0
     plane.current?.remove()
@@ -151,26 +182,40 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       if (!idle) return show('none')
       show('visible')
       const src = (id: string) => m.getSource(id) as maplibregl.GeoJSONSource
-      src('hop-city').setData({ type: 'FeatureCollection', features: HOP_CITIES.map(point) })
+      let route = makeRoute()
+      let legs = legsOf(route)
+      src('hop-city').setData({ type: 'FeatureCollection', features: route.map(point) })
       const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       if (still) {
-        src('hop-line').setData({ type: 'FeatureCollection', features: [line(HOP_LEGS.flat())] })
+        src('hop-line').setData({ type: 'FeatureCollection', features: [line(legs.flat())] })
         return
       }
-      const cycle = HOP_LEGS.length * (HOP_MS + PAUSE_MS) + 700
+      const cycle = legs.length * (HOP_MS + PAUSE_MS) + 700
       const t0 = performance.now()
+      let round = 0
       let heading = 90
       const tick = (now: number) => {
-        const t = Math.max(0, now - t0) % cycle
-        const leg = Math.min(HOP_LEGS.length - 1, Math.floor(t / (HOP_MS + PAUSE_MS)))
+        const elapsed = Math.max(0, now - t0)
+        const t = elapsed % cycle
+        // Each lap is a new random trip, so the animation never repeats itself.
+        if (Math.floor(elapsed / cycle) !== round) {
+          round = Math.floor(elapsed / cycle)
+          route = makeRoute()
+          legs = legsOf(route)
+          src('hop-city').setData({ type: 'FeatureCollection', features: route.map(point) })
+        }
+        // The idle city dots twinkle in two alternating groups.
+        m.setPaintProperty('hop-pool-0', 'circle-opacity', 0.3 + 0.3 * Math.sin(elapsed / 500))
+        m.setPaintProperty('hop-pool-1', 'circle-opacity', 0.3 + 0.3 * Math.sin(elapsed / 500 + Math.PI))
+        const leg = Math.min(legs.length - 1, Math.floor(t / (HOP_MS + PAUSE_MS)))
         const within = t - leg * (HOP_MS + PAUSE_MS)
-        const hopping = within < HOP_MS && t < HOP_LEGS.length * (HOP_MS + PAUSE_MS)
+        const hopping = within < HOP_MS && t < legs.length * (HOP_MS + PAUSE_MS)
         const k = hopping ? within / HOP_MS : 1
         const eased = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2
-        const arc = HOP_LEGS[leg]
+        const arc = legs[leg]
         const upto = Math.round(eased * (arc.length - 1))
         const here = arc[upto]
-        const done = HOP_LEGS.slice(0, leg).flat()
+        const done = legs.slice(0, leg).flat()
         src('hop-line').setData({ type: 'FeatureCollection', features: [line([...done, ...arc.slice(0, upto + 1)])] })
         if (!plane.current) {
           const el = document.createElement('div')
@@ -187,7 +232,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
         inner.style.filter = `drop-shadow(0 ${3 + 12 * lift}px ${4 + 7 * lift}px rgba(10,40,90,${0.35 - 0.12 * lift}))`
         // A ring ripples out from the city the plane has just reached.
         const landed = hopping ? 0 : Math.min(1, (within - HOP_MS) / PAUSE_MS)
-        const dest = HOP_CITIES[leg + 1]
+        const dest = route[leg + 1]
         src('hop-ping').setData({ type: 'FeatureCollection', features: hopping ? [] : [point(dest)] })
         m.setPaintProperty('hop-ping', 'circle-radius', 5 + 22 * landed)
         m.setPaintProperty('hop-ping', 'circle-stroke-opacity', 0.7 * (1 - landed))

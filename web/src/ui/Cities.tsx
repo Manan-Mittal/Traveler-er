@@ -3,6 +3,8 @@ import { actions } from '../store'
 import type { Trip } from '../types'
 import Search from './Search'
 import { Btn, Sub } from './kit'
+import { focusMap } from '../focus'
+import { formatDay } from '../format'
 
 /** Lets a country or multi-city trip list its cities and spread its days across them. */
 export default function Cities({ trip }: { trip: Trip }) {
@@ -16,7 +18,10 @@ export default function Cities({ trip }: { trip: Trip }) {
       </Btn>
     )
   }
-  const dayCount = (id: string) => trip.days.filter((d) => d.cityId === id).length
+  const when = (id: string) => {
+    const ds = trip.days.filter((d) => d.cityId === id).map((d) => d.date).sort()
+    return ds.length === 0 ? 'no days yet' : ds.length === 1 ? formatDay(ds[0]) : `${formatDay(ds[0])} – ${formatDay(ds.at(-1)!)}`
+  }
   const unassigned = trip.days.filter((d) => !d.cityId).length
   return (
     <section className="space-y-2" aria-label="Cities">
@@ -25,8 +30,10 @@ export default function Cities({ trip }: { trip: Trip }) {
         <div className="flex flex-wrap gap-2">
           {trip.cities.map((c) => (
             <span key={c.id} className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] py-1 pl-3 pr-1 text-[13px] font-medium text-[var(--accent)]">
-              {c.name}
-              <span className="text-[var(--text-2)]">· {dayCount(c.id)}d</span>
+              <button className="py-1" aria-label={`Show ${c.name} on the map`} onClick={() => focusMap({ lat: c.lat, lon: c.lon, zoom: 11 })}>
+                {c.name}
+              </button>
+              <span className="text-[var(--text-2)]">· {when(c.id)}</span>
               <button className="grid h-6 w-6 place-items-center rounded-full text-[var(--text-2)]" aria-label={`Remove ${c.name}`} onClick={() => actions.removeCity(trip.id, c.id)}>
                 ✕
               </button>
