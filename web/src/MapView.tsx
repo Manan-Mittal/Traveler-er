@@ -3,8 +3,9 @@ import maplibregl from 'maplibre-gl'
 import type { Stop } from './types'
 import type { ZoneGeo } from './useDayGeo'
 
-const style = () =>
-  `https://tiles.openfreemap.org/styles/${window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'positron'}`
+import { isDark } from './theme'
+
+const style = () => `https://tiles.openfreemap.org/styles/${isDark() ? 'dark' : 'positron'}`
 
 export interface MapLink {
   from: [number, number]
@@ -26,26 +27,6 @@ interface Props {
   sheetTop: number
 }
 
-// Great-circle-ish arcs between far-apart cities, drawn as a dotted route that drifts around the idle globe.
-const WORLD_ARCS: [number, number][] = [
-  [-74, 40.7], [-0.1, 51.5], [55.3, 25.2], [121.5, 25], [139.7, 35.7], [-122.4, 37.8], [-74, 40.7],
-]
-const arc = (a: [number, number], b: [number, number]): [number, number][] =>
-  Array.from({ length: 25 }, (_, i) => {
-    const t = i / 24
-    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + Math.sin(Math.PI * t) * 8]
-  })
-const worldLine: GeoJSON.Feature = {
-  type: 'Feature',
-  properties: {},
-  geometry: { type: 'LineString', coordinates: WORLD_ARCS.slice(1).flatMap((p, i) => arc(WORLD_ARCS[i], p)) },
-}
-
-const worldCities: GeoJSON.FeatureCollection = {
-  type: 'FeatureCollection',
-  features: WORLD_ARCS.slice(0, -1).map((c) => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })),
-}
-
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 // Keep in sync with the <aside> classes in App.tsx: a left sidebar on wide or landscape screens, a bottom sheet from 45% down otherwise.
@@ -60,10 +41,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   const markers = useRef<maplibregl.Marker[]>([])
   const labels = useRef<maplibregl.Marker[]>([])
   const ready = useRef(false)
-  const idleRef = useRef(true)
   const [tilesDown, setTilesDown] = useState(false)
-  const [onGlobe, setOnGlobe] = useState(true)
-  const spin = useRef<{ on: boolean; raf: number; stopped: boolean }>({ on: false, raf: 0, stopped: false })
   const latest = useRef({ zones, route, links })
   latest.current = { zones, route, links }
 
@@ -89,8 +67,8 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     const m = new maplibregl.Map({
       container: el.current!,
       style: style(),
-      center: [10, 22],
-      zoom: 1.3,
+      center: [10, 25],
+      zoom: 1.6,
       attributionControl: false,
     })
     // On a phone held upright the bottom sheet covers the bottom edge, so the credit sits at the top instead.
@@ -121,22 +99,11 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.addLayer({ id: 'zone-line', type: 'line', source: 'zone', paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-dasharray': [2, 2] } })
       m.addLayer({ id: 'link-line', type: 'line', source: 'link', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-dasharray': [0.5, 2.5] } })
       m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 4 } })
-      m.setProjection({ type: 'globe' })
-      // A soft atmosphere so the globe reads as a planet floating in space rather than a flat map.
-      m.setSky({ 'sky-color': '#9ecbff', 'sky-horizon-blend': 0.6, 'horizon-color': '#dbeeff', 'horizon-fog-blend': 0.8, 'fog-color': '#eaf4ff', 'fog-ground-blend': 0.3, 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] })
-      m.addSource('world-cities', { type: 'geojson', data: worldCities })
-      m.addLayer({ id: 'world-glow', type: 'circle', source: 'world-cities', layout: { visibility: idleRef.current ? 'visible' : 'none' }, paint: { 'circle-radius': 14, 'circle-color': '#0a84ff', 'circle-opacity': 0.18, 'circle-blur': 1 } })
-      m.addLayer({ id: 'world-dot', type: 'circle', source: 'world-cities', layout: { visibility: idleRef.current ? 'visible' : 'none' }, paint: { 'circle-radius': 4, 'circle-color': '#fff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2 } })
-      m.addSource('world', { type: 'geojson', data: worldLine })
-      m.addLayer({ id: 'world-line', type: 'line', source: 'world', layout: { 'line-cap': 'round', visibility: idleRef.current ? 'visible' : 'none' }, paint: { 'line-color': '#0a84ff', 'line-width': 2.5, 'line-dasharray': [0.5, 2.5] } })
       ready.current = true
       paint()
     })
     map.current = m
-    const stopSpin = () => (spin.current.stopped = true)
-    for (const ev of ['mousedown', 'touchstart', 'wheel'] as const) m.on(ev, stopSpin)
     return () => {
-      cancelAnimationFrame(spin.current.raf)
       ready.current = false
       m.remove()
     }
@@ -195,57 +162,20 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.flyTo({ center: pts[0], zoom: 14, duration: 700 })
     } else if (center) {
       m.flyTo({ center: [center.lon, center.lat], zoom: 13, duration: 700 })
-    }
-
-    // Nothing to show: rest on a slowly turning globe with a dotted route drifting around it, until the user touches the map.
-    const idle = pts.length === 0 && !center
-    const s = spin.current
-    setOnGlobe(idle)
-    const setWorldLine = (v: 'visible' | 'none') => {
-      for (const id of ['world-line', 'world-glow', 'world-dot']) if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', v)
-    }
-    cancelAnimationFrame(s.raf)
-    s.on = idle
-    idleRef.current = idle
-    if (!idle) {
-      setWorldLine('none')
-      return
-    }
-    s.stopped = false
-    m.setPadding({ top: 0, bottom: 0, left: 0, right: 0 })
-    m.flyTo({ center: [m.getCenter().lng, 22], zoom: 1.3, duration: 900 })
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    setWorldLine('visible')
-    const start = () => {
-      if (s.on && !s.stopped) s.raf = requestAnimationFrame(tick)
-    }
-    const tick = () => {
-      if (!s.on || s.stopped) return
-      m.jumpTo({ center: [m.getCenter().lng + 0.06, m.getCenter().lat] })
-      s.raf = requestAnimationFrame(tick)
-    }
-    // Start spinning once the fly-out ends; a jump on the next frame would cancel it.
-    m.once('moveend', start)
-    return () => {
-      m.off('moveend', start)
-      cancelAnimationFrame(s.raf)
+    } else {
+      // Nothing to show yet: a calm view of the whole world, centered on the part not covered by the panel.
+      m.flyTo({ center: [10, 25], zoom: 1.6, duration: 700 })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey])
 
   // maplibre's own CSS forces position: relative on the map element, so the absolute layer lives on a wrapper.
   return (
-    <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 60% 40%, #1c2b4a 0%, #0b1220 70%)' }}>
+    <div className="absolute inset-0 bg-[var(--bg)]">
       <div ref={el} className="h-full w-full" />
       {tilesDown && (
         <div role="status" className="glass pointer-events-none absolute left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] -translate-x-1/2 px-3 py-1.5 text-[12px] md:left-[calc(50%+200px)]">
           Map tiles couldn't load, so the base map is blank. Areas and routes still show.
-        </div>
-      )}
-      {onGlobe && (
-        <div className="pointer-events-none absolute inset-x-0 top-[max(3rem,env(safe-area-inset-top))] px-6 text-center text-white md:top-8 md:pl-[400px] landscape:pl-[min(400px,50%)]">
-          <div className="text-[26px] font-bold tracking-tight drop-shadow md:text-[34px]">Where to next?</div>
-          <div className="mt-1 text-[15px] opacity-70">Plan every day around the places you can walk.</div>
         </div>
       )}
     </div>
