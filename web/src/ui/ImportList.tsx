@@ -6,6 +6,7 @@ import { resolvePlaces } from '../import/resolve'
 import { flag, groupPlaces, type CountryGroup } from '../import/group'
 import { addToTrip } from '../import/apply'
 import type { RawPlace } from '../import/takeout'
+import { fetchSharedList, sharedListsEnabled } from '../import/sharedList'
 import { DateRangePicker } from './DatePicker'
 import { Btn, Input, Sub } from './kit'
 
@@ -17,9 +18,18 @@ type Stage = { kind: 'pick'; error?: string } | { kind: 'working'; done: number;
 export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose: () => void }) {
   const [stage, setStage] = useState<Stage>({ kind: 'pick' })
   const [dragging, setDragging] = useState(false)
+  const [link, setLink] = useState('')
   const input = useRef<HTMLInputElement>(null)
   const abort = useRef<AbortController | null>(null)
   useEffect(() => () => abort.current?.abort(), [])
+
+  const resolve = async (places: RawPlace[]) => {
+    abort.current = new AbortController()
+    setStage({ kind: 'working', done: 0, total: places.length })
+    const { found, missing } = await resolvePlaces(places, (done, total) => setStage({ kind: 'working', done, total }), abort.current.signal)
+    setStage({ kind: 'review', groups: groupPlaces(found), missing })
+  }
+  const fail = (e: unknown) => (e as Error).name !== 'AbortError' && setStage({ kind: 'pick', error: (e as Error).message })
 
   const run = async (files: File[]) => {
     if (!files.length) return
@@ -29,12 +39,18 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
         setStage({ kind: 'pick', error: skipped.length ? `Couldn't read ${skipped.join(', ')}.` : 'No saved places in those files. Pick the Saved folder or Saved Places.json from your Takeout export.' })
         return
       }
-      abort.current = new AbortController()
-      setStage({ kind: 'working', done: 0, total: places.length })
-      const { found, missing } = await resolvePlaces(places, (done, total) => setStage({ kind: 'working', done, total }), abort.current.signal)
-      setStage({ kind: 'review', groups: groupPlaces(found), missing })
+      await resolve(places)
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') setStage({ kind: 'pick', error: (e as Error).message })
+      fail(e)
+    }
+  }
+
+  const runLink = async () => {
+    setStage({ kind: 'working', done: 0, total: 0 })
+    try {
+      await resolve(await fetchSharedList(link))
+    } catch (e) {
+      fail(e)
     }
   }
 
@@ -49,6 +65,21 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
 
       {stage.kind === 'pick' && (
         <>
+          {sharedListsEnabled && (
+            <form className="space-y-2" onSubmit={(e) => (e.preventDefault(), runLink())}>
+              <label className="block text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]" htmlFor="gmaps-link">
+                Paste a shared list link
+              </label>
+              <div className="flex gap-2">
+                <Input id="gmaps-link" inputMode="url" placeholder="https://maps.app.goo.gl/…" value={link} onChange={(e) => setLink(e.target.value)} />
+                <Btn kind="primary" type="submit" disabled={!/^https:\/\/\S+$/.test(link.trim())}>
+                  Import
+                </Btn>
+              </div>
+              <Sub>In Google Maps, open the list, tap Share, and copy the link. The list has to be shared, not private.</Sub>
+            </form>
+          )}
+          {sharedListsEnabled && <div className="text-center text-[12px] font-medium uppercase tracking-wide text-[var(--text-2)]">or import everything from Takeout</div>}
           <ol className="space-y-1.5 text-[14px] text-[var(--text-2)]">
             <li>
               1. Open{' '}
@@ -79,11 +110,9 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
       {stage.kind === 'working' && (
         <div className="space-y-2 py-4">
           <div className="h-2 overflow-hidden rounded-full bg-[var(--accent-soft)]">
-            <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${(stage.done / stage.total) * 100}%` }} />
+            <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${stage.total ? (stage.done / stage.total) * 100 : 5}%` }} />
           </div>
-          <Sub>
-            Finding where your places are… {stage.done} of {stage.total}
-          </Sub>
+          <Sub>{stage.total ? `Finding where your places are… ${stage.done} of ${stage.total}` : 'Opening your list…'}</Sub>
         </div>
       )}
 
