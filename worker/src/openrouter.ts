@@ -3,22 +3,28 @@ export interface Env {
   ALLOWED_ORIGINS: string
 }
 
-interface ModelInfo {
+export interface ModelInfo {
   id: string
   context_length?: number
-  pricing?: { prompt?: string; completion?: string }
+  pricing?: Record<string, string>
+}
+
+/** Only ever call models whose id ends in ":free" and whose every price field is zero, so no request can be billed. */
+export const isFree = (m: ModelInfo) => {
+  const prices = Object.values(m.pricing ?? {})
+  return m.id.endsWith(':free') && prices.length > 0 && prices.every((p) => Number(p) === 0)
 }
 
 let modelCache: { at: number; ids: string[] } | null = null
 
-/** Models OpenRouter currently lists at $0 for both prompt and completion, largest context first. */
+/** Free models OpenRouter currently lists, largest context first. */
 export async function freeModels(env: Env): Promise<string[]> {
   if (modelCache && Date.now() - modelCache.at < 3600_000) return modelCache.ids
   const r = await fetch('https://openrouter.ai/api/v1/models', { headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}` } })
   if (!r.ok) throw new Error(`model list failed (${r.status})`)
   const { data } = (await r.json()) as { data: ModelInfo[] }
   const ids = data
-    .filter((m) => Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0 && !m.id.includes('image'))
+    .filter((m) => isFree(m) && !m.id.includes('image'))
     .sort((a, b) => (b.context_length ?? 0) - (a.context_length ?? 0))
     .map((m) => m.id)
   modelCache = { at: Date.now(), ids }
@@ -27,7 +33,7 @@ export async function freeModels(env: Env): Promise<string[]> {
 
 /** Ask a free model for JSON, trying the next one when a model is rate limited or returns garbage. */
 export async function askJson<T>(env: Env, system: string, user: string, tries = 4): Promise<T> {
-  const models = (await freeModels(env)).slice(0, tries)
+  const models = (await freeModels(env)).filter((m) => m.endsWith(':free')).slice(0, tries)
   let lastError = 'no free models available'
   for (const model of models) {
     try {
