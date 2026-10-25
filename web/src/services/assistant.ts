@@ -1,4 +1,5 @@
 import type { Category, Zone } from '../types'
+import { authHeaders } from '../auth'
 
 export interface DraftStop {
   name: string
@@ -13,7 +14,7 @@ export const assistantEnabled = Boolean(import.meta.env.VITE_API_URL)
 export async function draftDay(zone: Zone, interests: string, stopCount: number): Promise<DraftStop[]> {
   const r = await fetch(`${import.meta.env.VITE_API_URL}/api/plan`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ place: zone.name, lat: zone.lat, lon: zone.lon, walkMinutes: zone.walkMinutes, interests, stopCount }),
   }).catch(() => {
     throw new Error("Couldn't reach the assistant. Check your connection and try again.")

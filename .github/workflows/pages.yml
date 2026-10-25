@@ -34,6 +34,7 @@ jobs:
         env:
           VITE_BASE: /Traveler-er/
           VITE_API_URL: ${{ vars.VITE_API_URL || 'https://traveler-er-api.manan-mittal2020.workers.dev' }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || '' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

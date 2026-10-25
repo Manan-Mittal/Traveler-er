@@ -86,9 +86,23 @@ export function parseList(body: string): SharedList {
   return { name: str(list[4]) || 'Shared list', places }
 }
 
+/** Follows redirects one hop at a time and stops if one leaves Google, so the worker never fetches an arbitrary site. */
+async function followGoogle(link: string): Promise<{ url: string; text: () => Promise<string> }> {
+  let url = link
+  for (let i = 0; i < 6; i++) {
+    const r = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'manual' })
+    const next = r.status >= 300 && r.status < 400 ? r.headers.get('Location') : null
+    if (!next) return { url, text: () => r.text() }
+    url = new URL(next, url).toString()
+    // A hop off the share hosts (e.g. the consent page) still carries the list id in its URL, so read it there instead of fetching it.
+    if (!isShareLink(url)) return { url, text: async () => '' }
+  }
+  return { url, text: async () => '' }
+}
+
 export async function fetchSharedList(link: string): Promise<SharedList> {
   if (!isShareLink(link)) throw new Error('That isn’t a Google Maps list link')
-  const hop = await fetch(link.trim(), { headers: { 'User-Agent': UA }, redirect: 'follow' })
+  const hop = await followGoogle(link.trim())
   const ref = listRef(hop.url) ?? listRef(await hop.text())
   if (!ref) throw new Error('Couldn’t find a list in that link. Open the list in Google Maps, tap Share, and copy the link.')
   const r = await fetch(getlistUrl(ref), { headers: { 'User-Agent': UA } })

@@ -91,6 +91,13 @@ const set = (next: State) => {
   listeners.forEach((l) => l())
 }
 
+export const getState = () => state
+
+export const subscribe = (l: () => void) => {
+  listeners.add(l)
+  return () => void listeners.delete(l)
+}
+
 export const useStore = () =>
   useSyncExternalStore(
     (l) => {
@@ -115,6 +122,16 @@ const updateTrip = (id: string, fn: (t: Trip) => Trip) =>
   set({ ...state, trips: state.trips.map((t) => (t.id === id ? { ...fn(t), updatedAt: Date.now() } : t)) })
 
 export const actions = {
+  /** Swaps in trips merged from the cloud (validated like any untrusted input), keeping the open trip if it still exists. */
+  replaceTrips(list: unknown[]) {
+    const trips = cleanTrips(list)
+    const open = trips.some((t) => t.id === state.tripId)
+    set({ trips, tripId: open ? state.tripId : null, dayId: open ? state.dayId : null })
+  },
+  /** Forgets every trip on this device (used on sign-out). */
+  clearAll() {
+    set({ trips: [], tripId: null, dayId: null })
+  },
   exportAll(): string {
     return JSON.stringify({ app: 'traveler-er', version: 1, trips: state.trips }, null, 2)
   },
