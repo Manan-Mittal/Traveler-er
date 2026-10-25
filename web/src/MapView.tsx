@@ -181,6 +181,25 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
 
   useEffect(paint, [zones, route, links, world])
 
+  // Opening "Where I've been" frames the countries already visited.
+  const worldOn = !!world
+  useEffect(() => {
+    const m = map.current
+    const w = latest.current.world
+    if (!m || !w || !w.visited.size) return
+    const b = new maplibregl.LngLatBounds()
+    for (const f of w.countries.features) {
+      const g = f.geometry
+      if (!w.visited.has(f.properties?.id) || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) continue
+      for (const poly of g.type === 'Polygon' ? [g.coordinates] : g.coordinates) for (const c of poly[0]) b.extend(c as [number, number])
+    }
+    m.setPadding(panelPadding(m.getContainer().clientWidth, m.getContainer().clientHeight, sheetTop))
+    // Countries far apart may not fit a phone screen even zoomed all the way out; then just center on them.
+    const cam = m.cameraForBounds(b, { padding: 24, maxZoom: 4 })
+    m.easeTo(cam ? { ...cam, duration: 700 } : { center: b.getCenter(), zoom: 0, duration: 700 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [worldOn])
+
   // Tapping a city chip flies the map there, keeping the target in the part the panel leaves free.
   useEffect(
     () =>
