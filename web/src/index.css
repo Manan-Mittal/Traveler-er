@@ -34,8 +34,10 @@
 
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); overscroll-behavior: none; }
-button { font: inherit; color: inherit; cursor: pointer; }
-input, textarea { font: inherit; color: inherit; }
+@layer base {
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, textarea, select { font: inherit; color: inherit; }
+}
 
 .glass {
   background: var(--surface);
