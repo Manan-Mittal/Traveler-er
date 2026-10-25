@@ -5,6 +5,10 @@ interface Itinerary {
   transfers?: number
 }
 
+// Failed lookups aren't cached, so remember them briefly to avoid retrying on every reorder.
+const failedAt = new Map<string, number>()
+const RETRY_AFTER_MS = 10 * 60 * 1000
+
 /**
  * Door-to-door public transit time between two points on a given day, from Transitous (open, global).
  * Returns null when no transit option is found or the service is unreachable.
@@ -14,13 +18,16 @@ export async function transitMinutes(
   b: { lat: number; lon: number },
   date: string,
 ): Promise<{ minutes: number; transfers: number } | null> {
-  const time = `${date}T10:00:00Z`
+  // 10:00 local at the origin. Longitude gives the zone to within an hour, which is plenty for a transit estimate.
+  const time = new Date(Date.parse(`${date}T10:00:00Z`) - Math.round(a.lon / 15) * 3600_000).toISOString()
   const params = new URLSearchParams({
     fromPlace: `${a.lat},${a.lon}`,
     toPlace: `${b.lat},${b.lon}`,
     time,
     numItineraries: '1',
   })
+  const key = `transit:${a.lat.toFixed(4)},${a.lon.toFixed(4)}>${b.lat.toFixed(4)},${b.lon.toFixed(4)}:${date}`
+  if (Date.now() - (failedAt.get(key) ?? 0) < RETRY_AFTER_MS) return null
   try {
     const data = await cachedJson(
       `transit:${a.lat.toFixed(4)},${a.lon.toFixed(4)}>${b.lat.toFixed(4)},${b.lon.toFixed(4)}:${date}`,
@@ -37,6 +44,7 @@ export async function transitMinutes(
     if (!it?.duration) return null
     return { minutes: Math.round(it.duration / 60), transfers: it.transfers ?? 0 }
   } catch {
+    failedAt.set(key, Date.now())
     return null
   }
 }
