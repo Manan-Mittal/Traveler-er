@@ -6,6 +6,7 @@ import Assistant from './Assistant'
 import { modeLabel } from '../services/transit'
 import { Row, Segmented, Sub, icon } from './kit'
 import { formatDay } from '../format'
+import { focusMap } from '../focus'
 
 const WALK_CHOICES = [15, 30, 45, 60] as const
 
@@ -167,17 +168,24 @@ export default function DayView({ trip, day, geo }: { trip: Trip; day: Day; geo:
       </div>
 
       {trip.cities.length > 0 && (
+        <div className="space-y-1.5">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]">Where is this day?</h2>
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="City for this day">
           {trip.cities.map((c) => (
             <button
               key={c.id}
               aria-pressed={c.id === day.cityId}
-              onClick={() => actions.setDayCity(trip.id, day.id, c.id === day.cityId ? undefined : c.id)}
+              onClick={() => {
+                actions.setDayCity(trip.id, day.id, c.id === day.cityId ? undefined : c.id)
+                if (c.id !== day.cityId) focusMap({ lat: c.lat, lon: c.lon, zoom: 11 })
+              }}
               className={`shrink-0 rounded-full px-3 py-1.5 pointer-coarse:py-2.5 text-[13px] font-medium ${c.id === day.cityId ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent)]'}`}
             >
               {c.name}
             </button>
           ))}
+        </div>
+        <Sub>Pick the city you'll be in. The map flies there.</Sub>
         </div>
       )}
 
