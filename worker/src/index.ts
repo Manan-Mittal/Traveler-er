@@ -6,6 +6,7 @@ import { HttpError, createSession, endSession, requireUser, verifyGoogleToken } 
 import { overQuota, type DbEnv } from './db.ts'
 import { deleteTrip, listTrips, putTrip } from './trips.ts'
 import { SAMPLE } from './sample.ts'
+import { getVisited, putVisited } from './visited.ts'
 
 export interface Env extends AiEnv, DbEnv {
   GOOGLE_CLIENT_ID: string
@@ -95,6 +96,13 @@ export default {
         if (await overQuota(env, user.id, 'save', 1200)) throw new HttpError(429, 'Too many saves, try again in a bit')
         if (req.method === 'PUT') await putTrip(env, user, decodeURIComponent(trip), await body(req, 1_100_000))
         else await deleteTrip(env, user, decodeURIComponent(trip))
+        return json({ ok: true })
+      }
+
+      if (url.pathname === '/api/visited' && req.method === 'GET') return json({ visited: await getVisited(env, user) })
+      if (url.pathname === '/api/visited' && req.method === 'PUT') {
+        if (await overQuota(env, user.id, 'save', 1200)) throw new HttpError(429, 'Too many saves, try again in a bit')
+        await putVisited(env, user, await body(req, 210_000))
         return json({ ok: true })
       }
 

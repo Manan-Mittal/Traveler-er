@@ -16,6 +16,14 @@ export interface MapLink {
   color: string
 }
 
+/** The "Where I've been" layer: every country, the visited ones filled in, and dots for visited cities. */
+export interface WorldLayer {
+  countries: GeoJSON.FeatureCollection
+  visited: ReadonlySet<string>
+  cities: { lat: number; lon: number }[]
+  onToggle: (id: string) => void
+}
+
 interface Props {
   stops: Stop[]
   zones: ZoneGeo[]
@@ -26,6 +34,7 @@ interface Props {
   colorOf: (s: Stop) => string
   /** Where the phone bottom sheet's top edge sits, as a fraction of the height. */
   sheetTop: number
+  world?: WorldLayer
 }
 
 // The idle world map: a dot hops between cities along a dotted trail, then starts over.
@@ -67,7 +76,7 @@ const panelPadding = (w: number, h: number, sheetTop: number) =>
     ? { top: 0, bottom: 0, left: Math.min(400, w * 0.5) + 12, right: 0 }
     : { top: 0, bottom: Math.round(h * (1 - sheetTop)), left: 0, right: 0 }
 
-export default function MapView({ stops, zones, route, links, center, inZone, colorOf, sheetTop }: Props) {
+export default function MapView({ stops, zones, route, links, center, inZone, colorOf, sheetTop, world }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const markers = useRef<maplibregl.Marker[]>([])
@@ -75,13 +84,17 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   const ready = useRef(false)
   const plane = useRef<maplibregl.Marker | null>(null)
   const [tilesDown, setTilesDown] = useState(false)
-  const latest = useRef({ zones, route, links })
-  latest.current = { zones, route, links }
+  const latest = useRef({ zones, route, links, world })
+  latest.current = { zones, route, links, world }
 
   const paint = () => {
     const m = map.current
     if (!m || !ready.current) return
-    const { zones: zs, route: rs, links: ls } = latest.current
+    const { zones: zs, route: rs, links: ls, world: w } = latest.current
+    ;(m.getSource('country') as maplibregl.GeoJSONSource).setData(
+      w ? { type: 'FeatureCollection', features: w.countries.features.map((f) => ({ ...f, properties: { ...f.properties, v: w.visited.has(f.properties?.id) } })) } : empty,
+    )
+    ;(m.getSource('visited-city') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features: (w?.cities ?? []).map((c) => point([c.lon, c.lat])) })
     ;(m.getSource('zone') as maplibregl.GeoJSONSource).setData({
       type: 'FeatureCollection',
       features: zs.flatMap((z) => (z.polygon ? [{ ...z.polygon, properties: { color: z.color } }] : [])),
@@ -125,6 +138,13 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     })
     m.on('style.load', () => {
       foldAttribution()
+      // Countries sit under the base map's place names so those stay readable.
+      const firstLabel = m.getStyle().layers.find((l) => l.type === 'symbol')?.id
+      m.addSource('country', { type: 'geojson', data: empty })
+      m.addSource('visited-city', { type: 'geojson', data: empty })
+      m.addLayer({ id: 'country-fill', type: 'fill', source: 'country', paint: { 'fill-color': '#0a84ff', 'fill-opacity': ['case', ['get', 'v'], 0.45, 0] } }, firstLabel)
+      m.addLayer({ id: 'country-line', type: 'line', source: 'country', filter: ['get', 'v'], paint: { 'line-color': '#0a84ff', 'line-width': 1 } }, firstLabel)
+      m.addLayer({ id: 'visited-city', type: 'circle', source: 'visited-city', paint: { 'circle-radius': 3.5, 'circle-color': '#fff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2 } })
       m.addSource('zone', { type: 'geojson', data: empty })
       m.addSource('route', { type: 'geojson', data: empty })
       m.addSource('link', { type: 'geojson', data: empty })
@@ -145,6 +165,13 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       paint()
       m.fire('hop-ready')
     })
+    // Tapping a country while "Where I've been" is open marks or unmarks it.
+    m.on('click', 'country-fill', (e) => {
+      const id = e.features?.[0]?.properties?.id
+      if (typeof id === 'string') latest.current.world?.onToggle(id)
+    })
+    m.on('mouseenter', 'country-fill', () => latest.current.world && (m.getCanvas().style.cursor = 'pointer'))
+    m.on('mouseleave', 'country-fill', () => (m.getCanvas().style.cursor = ''))
     map.current = m
     return () => {
       ready.current = false
@@ -152,7 +179,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     }
   }, [])
 
-  useEffect(paint, [zones, route, links])
+  useEffect(paint, [zones, route, links, world])
 
   // Tapping a city chip flies the map there, keeping the target in the part the panel leaves free.
   useEffect(
@@ -166,7 +193,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     [sheetTop],
   )
 
-  const idle = stops.length === 0 && zones.length === 0 && !center
+  const idle = stops.length === 0 && zones.length === 0 && !center && !world
   useEffect(() => {
     const m = map.current
     if (!m) return

@@ -12,7 +12,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns'
 const MAX_DAYS = 366
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-export default function TripList({ trips }: { trips: Trip[] }) {
+export default function TripList({ trips, onWorld }: { trips: Trip[]; onWorld: () => void }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [start, setStart] = useState('')
@@ -31,6 +31,14 @@ export default function TripList({ trips }: { trips: Trip[] }) {
   return (
     <div className="space-y-5">
       <Account />
+      <button onClick={onWorld} className="flex min-h-11 w-full items-center gap-3 rounded-2xl bg-[var(--accent-soft)] px-4 py-3 text-left">
+        <span aria-hidden className="text-[22px]">🌍</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">Where I've been</span>
+          <span className="block text-[12px] text-[var(--text-2)]">Countries, continents and cities you've visited</span>
+        </span>
+        <span className="text-[var(--text-2)]">›</span>
+      </button>
       <Title>Trips</Title>
       {trips.length === 0 && !adding && <Sub>Plan your first trip. Each day gets its own walkable zone on the map.</Sub>}
       <div>

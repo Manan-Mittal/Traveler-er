@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { api, getSession, onSessionChange, signOut } from './auth'
 import { actions, getState, subscribe } from './store'
 import type { Trip } from './types'
+import { flushAndClearVisited } from './visited'
 
 /**
  * Keeps trips in the cloud while signed in. The browser copy stays the working copy, so the app
@@ -134,10 +135,11 @@ async function pull() {
   }
 }
 
-/** Upload everything pending, then sign out and remove trips from this device. */
+/** Upload everything pending, then sign out and remove trips and visited places from this device. */
 export async function signOutAndClear() {
   clearTimeout(timer)
   await push()
+  await flushAndClearVisited()
   await signOut()
   actions.clearAll()
 }
