@@ -43,7 +43,10 @@ export default function TripList({ trips }: { trips: Trip[] }) {
       </div>
       {adding ? (
         <div className="space-y-2">
-          <Input autoFocus placeholder="Trip name, e.g. Taiwan" value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="block text-[13px] font-semibold text-[var(--text-2)]" htmlFor="trip-name">Name your trip</label>
+          <Input id="trip-name" autoFocus placeholder="e.g. Summer in Taiwan" value={name} onChange={(e) => setName(e.target.value)} />
+          <Sub>Just a label. You'll pick the places and cities after you create it.</Sub>
+          <div className="pt-1 text-[13px] font-semibold text-[var(--text-2)]">When</div>
           <DateRangePicker start={start} end={end} onChange={(a, b) => (setStart(a), setEnd(b))} />
           {tooLong && <p className="text-[12px] text-[var(--danger)]">Trips can be at most {MAX_DAYS} days. Pick a shorter range.</p>}
           <div className="flex gap-2">

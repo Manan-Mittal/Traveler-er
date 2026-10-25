@@ -24,6 +24,21 @@ interface Props {
   colorOf: (s: Stop) => string
 }
 
+// Great-circle-ish arcs between far-apart cities, drawn as a dotted route that drifts around the idle globe.
+const WORLD_ARCS: [number, number][] = [
+  [-74, 40.7], [-0.1, 51.5], [55.3, 25.2], [121.5, 25], [139.7, 35.7], [-122.4, 37.8], [-74, 40.7],
+]
+const arc = (a: [number, number], b: [number, number]): [number, number][] =>
+  Array.from({ length: 25 }, (_, i) => {
+    const t = i / 24
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + Math.sin(Math.PI * t) * 8]
+  })
+const worldLine: GeoJSON.Feature = {
+  type: 'Feature',
+  properties: {},
+  geometry: { type: 'LineString', coordinates: WORLD_ARCS.slice(1).flatMap((p, i) => arc(WORLD_ARCS[i], p)) },
+}
+
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 // Keep in sync with the <aside> classes in App.tsx: a left sidebar on wide or landscape screens, a bottom sheet from 45% down otherwise.
@@ -38,6 +53,8 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   const markers = useRef<maplibregl.Marker[]>([])
   const labels = useRef<maplibregl.Marker[]>([])
   const ready = useRef(false)
+  const idleRef = useRef(true)
+  const spin = useRef<{ on: boolean; raf: number; stopped: boolean }>({ on: false, raf: 0, stopped: false })
   const latest = useRef({ zones, route, links })
   latest.current = { zones, route, links }
 
@@ -63,8 +80,8 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     const m = new maplibregl.Map({
       container: el.current!,
       style: style(),
-      center: [121.5654, 25.033],
-      zoom: 11,
+      center: [10, 22],
+      zoom: 1.3,
       attributionControl: { compact: true },
     })
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
@@ -84,11 +101,17 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.addLayer({ id: 'zone-line', type: 'line', source: 'zone', paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-dasharray': [2, 2] } })
       m.addLayer({ id: 'link-line', type: 'line', source: 'link', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-dasharray': [0.5, 2.5] } })
       m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 4 } })
+      m.setProjection({ type: 'globe' })
+      m.addSource('world', { type: 'geojson', data: worldLine })
+      m.addLayer({ id: 'world-line', type: 'line', source: 'world', layout: { 'line-cap': 'round', visibility: idleRef.current ? 'visible' : 'none' }, paint: { 'line-color': '#0a84ff', 'line-width': 2.5, 'line-dasharray': [0.5, 2.5] } })
       ready.current = true
       paint()
     })
     map.current = m
+    const stopSpin = () => (spin.current.stopped = true)
+    for (const ev of ['mousedown', 'touchstart', 'wheel'] as const) m.on(ev, stopSpin)
     return () => {
+      cancelAnimationFrame(spin.current.raf)
       ready.current = false
       m.remove()
     }
@@ -141,6 +164,34 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     } else if (center) {
       m.flyTo({ center: [center.lon, center.lat], zoom: 13, duration: 700 })
     }
+
+    // Nothing to show: rest on a slowly turning globe with a dotted route drifting around it, until the user touches the map.
+    const idle = pts.length === 0 && !center
+    const s = spin.current
+    const setWorldLine = (v: 'visible' | 'none') => {
+      if (m.getLayer('world-line')) m.setLayoutProperty('world-line', 'visibility', v)
+    }
+    cancelAnimationFrame(s.raf)
+    s.on = idle
+    idleRef.current = idle
+    if (!idle) {
+      setWorldLine('none')
+      return
+    }
+    s.stopped = false
+    m.setPadding({ top: 0, bottom: 0, left: 0, right: 0 })
+    m.flyTo({ center: [m.getCenter().lng, 22], zoom: 1.3, duration: 900 })
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let frame = 0
+    setWorldLine('visible')
+    const tick = () => {
+      if (!s.on || s.stopped) return
+      frame++
+      m.jumpTo({ center: [m.getCenter().lng + 0.06, m.getCenter().lat] })
+      s.raf = requestAnimationFrame(tick)
+    }
+    s.raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(s.raf)
   }, [stops, zones, center])
 
   // maplibre's own CSS forces position: relative on the map element, so the absolute layer lives on a wrapper.
