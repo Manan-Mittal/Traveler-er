@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { Booking, City, Day, Stop, Trip, Zone } from './types'
 import { sampleTrip } from './sample'
+import { distanceKm } from './geo'
 
 const KEY = 'traveler-er:v1'
 
@@ -177,12 +178,22 @@ export const actions = {
   setDayCity(tripId: string, dayId: string, cityId: string | undefined) {
     updateTrip(tripId, (t) => ({ ...t, days: t.days.map((d) => (d.id === dayId ? { ...d, cityId } : d)) }))
   },
-  /** Gives each day a city, in order, as evenly as possible (for example 10 days over 3 cities is 4, 3, 3). */
+  /**
+   * Gives days without a city one, leaving days that already have a city alone. A day with areas goes to the
+   * city nearest its first area; the rest are spread over the cities in order, as evenly as possible.
+   */
   splitDaysAcrossCities(tripId: string) {
     updateTrip(tripId, (t) => {
       const n = t.cities.length
       if (n === 0) return t
-      return { ...t, days: t.days.map((d, i) => ({ ...d, cityId: t.cities[Math.min(n - 1, Math.floor((i * n) / t.days.length))].id })) }
+      const nearest = (p: { lat: number; lon: number }) => {
+        const c = t.cities.reduce((best, c) => (distanceKm(c, p) < distanceKm(best, p) ? c : best))
+        return distanceKm(c, p) < 150 ? c.id : undefined
+      }
+      const days = t.days.map((d) => (d.cityId || !d.zones[0] ? d : { ...d, cityId: nearest(d.zones[0]) }))
+      const open = days.flatMap((d, i) => (d.cityId ? [] : [i]))
+      open.forEach((dayIndex, k) => (days[dayIndex] = { ...days[dayIndex], cityId: t.cities[Math.min(n - 1, Math.floor((k * n) / open.length))].id }))
+      return { ...t, days }
     })
   },
   /** Returns the new zone's id. */

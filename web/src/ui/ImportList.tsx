@@ -21,16 +21,19 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
   const [link, setLink] = useState('')
   const input = useRef<HTMLInputElement>(null)
   const abort = useRef<AbortController | null>(null)
+  const stop = useRef(false)
   useEffect(() => () => abort.current?.abort(), [])
 
   const resolve = async (places: RawPlace[], skipped: string[] = []) => {
     if (!places.length) return setStage({ kind: 'pick', error: 'That list has no places in it.' })
     abort.current = new AbortController()
+    stop.current = false
     setStage({ kind: 'working', done: 0, total: places.length })
-    const { found, missing, lookupFailed } = await resolvePlaces(places, (done, total) => setStage({ kind: 'working', done, total }), abort.current.signal)
+    const { found, missing, lookupFailed } = await resolvePlaces(places, (done, total) => setStage({ kind: 'working', done, total }), abort.current.signal, () => stop.current)
     const notes = [
       ...(lookupFailed ? ["The place lookup service didn't answer for some places, so their city or location may be missing. Try again in a few minutes."] : []),
       ...(skipped.length ? [`Couldn't read ${skipped.join(', ')}.`] : []),
+      ...(stop.current && missing.length ? [`Stopped early, so some places weren't looked up yet. Import the same file again later to finish; places already found load instantly.`] : []),
     ]
     setStage({ kind: 'review', groups: groupPlaces(found), missing, notes })
   }
@@ -118,6 +121,9 @@ export default function ImportList({ trips, onClose }: { trips: Trip[]; onClose:
             <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${stage.total ? (stage.done / stage.total) * 100 : 5}%` }} />
           </div>
           <Sub>{stage.total ? `Finding where your places are… ${stage.done} of ${stage.total}` : 'Opening your list…'}</Sub>
+          {stage.total > 20 && (
+            <Btn onClick={() => (stop.current = true)}>Stop here and review what's found</Btn>
+          )}
         </div>
       )}
 
