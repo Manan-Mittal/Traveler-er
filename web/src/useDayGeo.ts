@@ -1,61 +1,111 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Day } from './types'
-import { walkLeg, walkZone, type Leg } from './services/valhalla'
+import type { Day, Stop, Zone } from './types'
+import { driveLeg, walkLeg, walkZone, type Leg } from './services/valhalla'
 import { inPolygon } from './geo'
-import { transitMinutes } from './services/transit'
+import { TRANSIT_BUFFER_MIN, transitMinutes } from './services/transit'
+import { orderedStops, zoneColor, zoneIdOf } from './zones'
 
-export interface DayGeo {
-  zone: GeoJSON.Feature<GeoJSON.Polygon> | null
-  legs: (Leg | null)[]
-  transit: ({ minutes: number; transfers: number } | null)[]
-  zoneError: string
-  routeError: string
-  inZone: (s: { lat: number; lon: number }) => boolean | null
+export interface ZoneGeo {
+  zone: Zone
+  color: string
+  polygon: GeoJSON.Feature<GeoJSON.Polygon> | null
+  error: string
 }
 
-/** Walk zone polygon and walking legs between consecutive stops for the selected day. */
+/** The hop from the previous zone into this one. `null` while loading, `'none'` when no route was found. */
+export type Link = { mode: 'transit' | 'drive'; minutes: number; km?: number; transfers?: number; shape?: [number, number][] } | 'none' | null
+
+export interface DayGeo {
+  zones: ZoneGeo[]
+  /** Stops in itinerary order (grouped by zone). */
+  stops: Stop[]
+  /** Walking leg from stops[i] to stops[i+1] when both are in the same zone, else null. */
+  legs: (Leg | null)[]
+  /** links[i] connects zones[i-1] to zones[i]; links[0] is always null. */
+  links: Link[]
+  routeError: string
+  zoneOf: (s: Stop) => string | undefined
+  colorOf: (s: Stop) => string
+  inZone: (s: Stop) => boolean | null
+}
+
+const keyOf = (day: Day | undefined, fields: (z: Zone) => unknown[]) => JSON.stringify((day?.zones ?? []).map((z) => [z.id, ...fields(z)]))
+
+/** Walk areas, walking legs inside each zone, and the transit or drive hop between zones for the selected day. */
 export function useDayGeo(day: Day | undefined): DayGeo {
-  const [zone, setZone] = useState<DayGeo['zone']>(null)
-  const [legs, setLegs] = useState<(Leg | null)[]>([])
-  const [transit, setTransit] = useState<DayGeo['transit']>([])
-  const [zoneError, setZoneError] = useState('')
+  const [polys, setPolys] = useState<Record<string, { polygon: ZoneGeo['polygon']; error: string }>>({})
+  const [linkState, setLinkState] = useState<Record<string, Link>>({})
+  const [legMap, setLegMap] = useState<Record<string, Leg | null>>({})
   const [routeError, setRouteError] = useState('')
 
-  const z = day?.zones[0]
+  const zones = day?.zones ?? []
+  const areaKey = keyOf(day, (z) => [z.lat, z.lon, z.walkMinutes])
   useEffect(() => {
-    setZone(null)
-    setZoneError('')
-    if (!z) return
+    setPolys({})
     const ctl = new AbortController()
-    walkZone(z.lat, z.lon, z.walkMinutes, ctl.signal)
-      .then((f) => !ctl.signal.aborted && setZone(f))
-      .catch((e: Error) => !ctl.signal.aborted && setZoneError(e.message))
+    for (const z of zones) {
+      walkZone(z.lat, z.lon, z.walkMinutes, ctl.signal)
+        .then((polygon) => !ctl.signal.aborted && setPolys((p) => ({ ...p, [z.id]: { polygon, error: '' } })))
+        .catch((e: Error) => !ctl.signal.aborted && setPolys((p) => ({ ...p, [z.id]: { polygon: null, error: e.message } })))
+    }
     return () => ctl.abort()
-  }, [z?.lat, z?.lon, z?.walkMinutes])
+  }, [areaKey])
 
-  const key = day?.stops.map((s) => s.id).join(',') ?? ''
+  const linkKey = keyOf(day, (z) => [z.lat, z.lon, z.arriveBy ?? 'transit']) + (day?.date ?? '')
   useEffect(() => {
-    const stops = day?.stops ?? []
-    setLegs(stops.slice(1).map(() => null))
-    setTransit(stops.slice(1).map(() => null))
-    setRouteError('')
+    setLinkState({})
+    if (!day) return
     const ctl = new AbortController()
-    const stale = () => ctl.signal.aborted
-    stops.slice(1).forEach((s, i) => {
-      walkLeg(stops[i], s, ctl.signal)
-        .then((l) => {
-          if (stale()) return
-          setLegs((prev) => prev.map((p, j) => (j === i ? l : p)))
-          // Only worth asking about transit when the walk is long.
-          if (l.minutes > 25 && day) {
-            transitMinutes(stops[i], s, day.date).then((t) => !stale() && setTransit((prev) => prev.map((p, j) => (j === i ? t : p))))
-          }
-        })
-        .catch((e: Error) => !stale() && setRouteError(e.message))
+    const put = (id: string, v: Link) => !ctl.signal.aborted && setLinkState((p) => ({ ...p, [id]: v }))
+    day.zones.forEach((z, i) => {
+      if (i === 0) return
+      const from = day.zones[i - 1]
+      const mode = z.arriveBy === 'drive' ? 'drive' : 'transit'
+      if (mode === 'drive') {
+        driveLeg(from, z, ctl.signal)
+          .then((l) => put(z.id, { mode, minutes: l.minutes, km: l.km, shape: l.shape }))
+          .catch(() => put(z.id, 'none'))
+      } else {
+        transitMinutes(from, z, day.date)
+          .then((t) => put(z.id, t ? { mode, minutes: t.minutes + TRANSIT_BUFFER_MIN, transfers: t.transfers } : 'none'))
+          .catch(() => put(z.id, 'none'))
+      }
     })
     return () => ctl.abort()
-  }, [key])
+  }, [linkKey])
 
-  const inZone = useMemo(() => (s: { lat: number; lon: number }) => (zone ? inPolygon(s.lon, s.lat, zone.geometry) : null), [zone])
-  return { zone, legs, transit, zoneError, routeError, inZone }
+  const stops = useMemo(() => (day ? orderedStops(day) : []), [day])
+  const zoneOf = useMemo(() => (s: Stop) => zoneIdOf(s, zones), [areaKey])
+  const colorOf = useMemo(() => (s: Stop) => zoneColor(zones.findIndex((z) => z.id === zoneOf(s))), [areaKey, zoneOf])
+
+  const pairs = stops.slice(1).map((s, i) => ({ a: stops[i], b: s, same: zoneOf(stops[i]) === zoneOf(s) }))
+  const legKey = pairs.map((p) => `${p.a.id}>${p.b.id}:${p.same}`).join(',')
+  useEffect(() => {
+    setLegMap({})
+    setRouteError('')
+    const ctl = new AbortController()
+    for (const p of pairs) {
+      if (!p.same) continue
+      walkLeg(p.a, p.b, ctl.signal)
+        .then((l) => !ctl.signal.aborted && setLegMap((m) => ({ ...m, [`${p.a.id}>${p.b.id}`]: l })))
+        .catch((e: Error) => !ctl.signal.aborted && setRouteError(e.message))
+    }
+    return () => ctl.abort()
+  }, [legKey])
+
+  const zoneGeos: ZoneGeo[] = zones.map((z, i) => ({ zone: z, color: zoneColor(i), polygon: polys[z.id]?.polygon ?? null, error: polys[z.id]?.error ?? '' }))
+  const inZone = (s: Stop) => {
+    const g = zoneGeos.find((x) => x.zone.id === zoneOf(s))
+    return g?.polygon ? inPolygon(s.lon, s.lat, g.polygon.geometry) : null
+  }
+  return {
+    zones: zoneGeos,
+    stops,
+    legs: pairs.map((p) => legMap[`${p.a.id}>${p.b.id}`] ?? null),
+    links: zones.map((z, i) => (i === 0 ? null : linkState[z.id] ?? null)),
+    routeError,
+    zoneOf,
+    colorOf,
+    inZone,
+  }
 }
