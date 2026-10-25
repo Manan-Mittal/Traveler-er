@@ -3,6 +3,7 @@ import { actions } from '../store'
 import type { Trip } from '../types'
 import { Btn, Input, Row, Sub, Title } from './kit'
 import { DateRangePicker } from './DatePicker'
+import ImportList from './ImportList'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 
 const MAX_DAYS = 366
@@ -15,10 +16,13 @@ export default function TripList({ trips }: { trips: Trip[] }) {
   const [end, setEnd] = useState('')
   const file = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
+  const [importing, setImporting] = useState(false)
   const length = start && end ? differenceInCalendarDays(parseISO(end), parseISO(start)) + 1 : 0
   const tooLong = length > MAX_DAYS
   const valid = name.trim() && start && end && end >= start && !tooLong
   const reset = () => (setAdding(false), setName(''), setStart(''), setEnd(''))
+
+  if (importing) return <ImportList trips={trips} onClose={() => setImporting(false)} />
 
   return (
     <div className="space-y-5">
@@ -66,6 +70,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
           >
             Export
           </Btn>
+          <Btn onClick={() => setImporting(true)}>Import Google Maps lists</Btn>
           <Btn onClick={() => file.current?.click()}>Import</Btn>
           <input
             ref={file}

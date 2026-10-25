@@ -14,7 +14,7 @@ interface PhotonFeature {
   properties: { name?: string; city?: string; state?: string; country?: string; street?: string; osm_key?: string; osm_value?: string }
 }
 
-const categoryOf = (key = '', value = ''): Category => {
+export const categoryOf = (key = '', value = ''): Category => {
   if (value === 'cafe') return 'cafe'
   if (['restaurant', 'fast_food', 'bar', 'pub', 'food_court', 'bakery', 'marketplace'].includes(value)) return 'food'
   if (key === 'tourism' || key === 'historic') return 'sight'
