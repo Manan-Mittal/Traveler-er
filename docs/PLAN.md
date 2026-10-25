@@ -22,7 +22,7 @@ web/ (React + Vite + TS)  ──>  OSM public APIs (Photon, Overpass, Valhalla, 
 ```
 
 Phase 1 stores trips in the browser (localStorage) with JSON export/import and is deployed
-to GitHub Pages. The Worker is needed only for the assistant (it holds the OpenRouter key).
+to GitHub Pages (free URL: manan-mittal.github.io/Traveler-er). The Worker is needed only for the assistant (it holds the OpenRouter key).
 When a Cloudflare account exists, the site moves to Cloudflare Pages + Access and trips sync
 to D1.
 
