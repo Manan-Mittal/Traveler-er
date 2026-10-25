@@ -33,6 +33,14 @@
 }
 
 html, body, #root { height: 100%; margin: 0; }
+#root { height: 100dvh; }
+body { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+/* iOS zooms the page when a focused field is under 16px. */
+@media (pointer: coarse) { input, select, textarea { font-size: 16px !important; } }
+/* Keep map controls clear of the notch and the home indicator. */
+.maplibregl-ctrl-top-right, .maplibregl-ctrl-top-left { margin-top: env(safe-area-inset-top); }
+.maplibregl-ctrl-top-right { margin-right: env(safe-area-inset-right); }
+.maplibregl-ctrl-top-left { margin-left: env(safe-area-inset-left); }
 body { background: var(--bg); color: var(--text); overscroll-behavior: none; }
 @layer base {
   button { font: inherit; color: inherit; cursor: pointer; }
