@@ -36,7 +36,8 @@ export interface Leg {
 }
 
 // Valhalla encodes route shapes as polyline with 6 decimal digits.
-function decode(str: string): LngLat[] {
+export function decode(str: string, precision = 6): LngLat[] {
+  const scale = 10 ** precision
   const out: LngLat[] = []
   let i = 0, lat = 0, lon = 0
   while (i < str.length) {
@@ -51,7 +52,7 @@ function decode(str: string): LngLat[] {
       if (axis === 0) lat += d
       else lon += d
     }
-    out.push([lon / 1e6, lat / 1e6])
+    out.push([lon / scale, lat / scale])
   }
   return out
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import type { Stop } from './types'
 import type { ZoneGeo } from './useDayGeo'
@@ -39,6 +39,11 @@ const worldLine: GeoJSON.Feature = {
   geometry: { type: 'LineString', coordinates: WORLD_ARCS.slice(1).flatMap((p, i) => arc(WORLD_ARCS[i], p)) },
 }
 
+const worldCities: GeoJSON.FeatureCollection = {
+  type: 'FeatureCollection',
+  features: WORLD_ARCS.slice(0, -1).map((c) => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })),
+}
+
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 // Keep in sync with the <aside> classes in App.tsx: a left sidebar on wide or landscape screens, a bottom sheet from 45% down otherwise.
@@ -54,6 +59,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   const labels = useRef<maplibregl.Marker[]>([])
   const ready = useRef(false)
   const idleRef = useRef(true)
+  const [onGlobe, setOnGlobe] = useState(true)
   const spin = useRef<{ on: boolean; raf: number; stopped: boolean }>({ on: false, raf: 0, stopped: false })
   const latest = useRef({ zones, route, links })
   latest.current = { zones, route, links }
@@ -102,6 +108,11 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.addLayer({ id: 'link-line', type: 'line', source: 'link', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-dasharray': [0.5, 2.5] } })
       m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 4 } })
       m.setProjection({ type: 'globe' })
+      // A soft atmosphere so the globe reads as a planet floating in space rather than a flat map.
+      m.setSky({ 'sky-color': '#9ecbff', 'sky-horizon-blend': 0.6, 'horizon-color': '#dbeeff', 'horizon-fog-blend': 0.8, 'fog-color': '#eaf4ff', 'fog-ground-blend': 0.3, 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] })
+      m.addSource('world-cities', { type: 'geojson', data: worldCities })
+      m.addLayer({ id: 'world-glow', type: 'circle', source: 'world-cities', layout: { visibility: idleRef.current ? 'visible' : 'none' }, paint: { 'circle-radius': 14, 'circle-color': '#0a84ff', 'circle-opacity': 0.18, 'circle-blur': 1 } })
+      m.addLayer({ id: 'world-dot', type: 'circle', source: 'world-cities', layout: { visibility: idleRef.current ? 'visible' : 'none' }, paint: { 'circle-radius': 4, 'circle-color': '#fff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2 } })
       m.addSource('world', { type: 'geojson', data: worldLine })
       m.addLayer({ id: 'world-line', type: 'line', source: 'world', layout: { 'line-cap': 'round', visibility: idleRef.current ? 'visible' : 'none' }, paint: { 'line-color': '#0a84ff', 'line-width': 2.5, 'line-dasharray': [0.5, 2.5] } })
       ready.current = true
@@ -168,8 +179,9 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     // Nothing to show: rest on a slowly turning globe with a dotted route drifting around it, until the user touches the map.
     const idle = pts.length === 0 && !center
     const s = spin.current
+    setOnGlobe(idle)
     const setWorldLine = (v: 'visible' | 'none') => {
-      if (m.getLayer('world-line')) m.setLayoutProperty('world-line', 'visibility', v)
+      for (const id of ['world-line', 'world-glow', 'world-dot']) if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', v)
     }
     cancelAnimationFrame(s.raf)
     s.on = idle
@@ -196,8 +208,14 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
 
   // maplibre's own CSS forces position: relative on the map element, so the absolute layer lives on a wrapper.
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 60% 40%, #1c2b4a 0%, #0b1220 70%)' }}>
       <div ref={el} className="h-full w-full" />
+      {onGlobe && (
+        <div className="pointer-events-none absolute inset-x-0 top-8 hidden text-center text-white md:block md:pl-[400px]">
+          <div className="text-[34px] font-bold tracking-tight drop-shadow">Where to next?</div>
+          <div className="mt-1 text-[15px] opacity-70">Plan every day around the places you can walk.</div>
+        </div>
+      )}
     </div>
   )
 }
