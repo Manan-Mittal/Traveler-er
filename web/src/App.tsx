@@ -5,6 +5,9 @@ import { useDayGeo } from './useDayGeo'
 import TripList from './ui/TripList'
 import DayView from './ui/DayView'
 import Bookings from './ui/Bookings'
+import Cities from './ui/Cities'
+import type { MapLink } from './MapView'
+import { zoneColor } from './zones'
 import { Btn, Sub, Title } from './ui/kit'
 
 export default function App() {
@@ -15,11 +18,19 @@ export default function App() {
   const geo = useDayGeo(day)
 
   const route = useMemo(() => geo.legs.flatMap((l) => (l ? [l.shape] : [])), [geo.legs])
-  const center = day?.zones[0]
-
+  const links = useMemo<MapLink[]>(() => {
+    const zs = day?.zones ?? []
+    return zs.flatMap((z, i) => {
+      if (i === 0) return []
+      const l = geo.links[i]
+      return [{ from: [zs[i - 1].lon, zs[i - 1].lat] as [number, number], to: [z.lon, z.lat] as [number, number], shape: l && l !== 'none' ? l.shape : undefined, color: zoneColor(i) }]
+    })
+  }, [day?.zones, geo.links])
+  const city = trip?.cities.find((c) => c.id === day?.cityId)
+  const center = day?.zones[0] ?? city
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <MapView stops={day?.stops ?? []} zone={geo.zone} route={route} center={center} inZone={geo.inZone} />
+      <MapView stops={geo.stops} zones={geo.zones} route={route} links={links} center={center} inZone={geo.inZone} colorOf={geo.colorOf} />
       <aside className="glass absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] top-[45%] overflow-y-auto overflow-x-hidden p-5 landscape:inset-x-auto landscape:bottom-[max(0.75rem,env(safe-area-inset-bottom))] landscape:left-[max(0.75rem,env(safe-area-inset-left))] landscape:top-3 landscape:w-[min(400px,50%)] md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:w-[400px]">
         {!trip ? (
           <TripList trips={trips} />
@@ -45,6 +56,7 @@ export default function App() {
             </div>
             {tab === 'days' ? (
               <>
+                <Cities trip={trip} />
                 <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                   {trip.days.map((d, i) => (
                     <button
@@ -57,7 +69,7 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                {day && <DayView key={day.id} tripId={trip.id} day={day} geo={geo} />}
+                {day && <DayView key={day.id} trip={trip} day={day} geo={geo} />}
               </>
             ) : (
               <Bookings trip={trip} />
