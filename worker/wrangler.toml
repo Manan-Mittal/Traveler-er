@@ -1,0 +1,9 @@
+name = "traveler-er-api"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[vars]
+# Comma-separated list of sites allowed to call this API.
+ALLOWED_ORIGINS = "https://manan-mittal.github.io,http://localhost:5173,http://localhost:4173"
+
+# Secret, set with: npx wrangler secret put OPENROUTER_API_KEY
