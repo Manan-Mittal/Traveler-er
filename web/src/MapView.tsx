@@ -210,14 +210,12 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     m.setPadding({ top: 0, bottom: 0, left: 0, right: 0 })
     m.flyTo({ center: [m.getCenter().lng, 22], zoom: 1.3, duration: 900 })
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    let frame = 0
     setWorldLine('visible')
     const start = () => {
       if (s.on && !s.stopped) s.raf = requestAnimationFrame(tick)
     }
     const tick = () => {
       if (!s.on || s.stopped) return
-      frame++
       m.jumpTo({ center: [m.getCenter().lng + 0.06, m.getCenter().lat] })
       s.raf = requestAnimationFrame(tick)
     }
