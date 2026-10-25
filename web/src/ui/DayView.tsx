@@ -48,7 +48,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
               ))}
             </div>
             <Sub>
-              {geo.zone ? 'Shaded area is everything within a walk of the center.' : geo.zoneError ? `Couldn't load the walk area (${geo.zoneError}). Try again later.` : 'Loading walk area…'}
+              {geo.zone ? 'Shaded area is everything within a walk of the center.' : geo.zoneError ? `Couldn't load the walk area right now: ${geo.zoneError}.` : 'Loading walk area…'}
               {outside > 0 && ` ${outside} stop${outside > 1 ? 's are' : ' is'} outside it (orange pins).`}
             </Sub>
           </div>
@@ -103,7 +103,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
           placeholder="Add a place"
           onPick={(p) => actions.addStop(tripId, day.id, { name: p.name, lat: p.lat, lon: p.lon, category: p.category, notes: '', source: 'user' })}
         />
-        {geo.routeError && <p className="text-[12px] text-[var(--danger)]">Couldn't get walking times ({geo.routeError}).</p>}
+        {geo.routeError && <p className="text-[12px] text-[var(--danger)]">Couldn't get walking times right now: {geo.routeError}.</p>}
       </section>
     </div>
   )
