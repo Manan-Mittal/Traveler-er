@@ -22,20 +22,24 @@ const MIRRORS = [
 
 /** Public Overpass servers get overloaded often, so try each mirror in turn before giving up. */
 async function overpass(query: string): Promise<Osm> {
+  const why: string[] = []
   for (const url of MIRRORS) {
+    const host = new URL(url).hostname
     try {
       const r = await fetch(url, {
         method: 'POST',
         body: 'data=' + encodeURIComponent(query),
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        // Overpass operators ask clients to identify themselves and block anonymous traffic.
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Traveler-er/0.1 (https://github.com/Manan-Mittal/Traveler-er)', Accept: 'application/json' },
         signal: AbortSignal.timeout(12_000),
       })
       if (r.ok) return (await r.json()) as Osm
-    } catch {
-      // timed out or unreachable: try the next mirror
+      why.push(`${host} ${r.status}`)
+    } catch (e) {
+      why.push(`${host} ${(e as Error).name === 'TimeoutError' ? 'timed out' : 'unreachable'}`)
     }
   }
-  throw new Error('The free map data servers are busy right now. Please try again in a minute.')
+  throw new Error(`The free map data servers are busy right now (${why.join(', ')}). Please try again in a minute.`)
 }
 
 /** Real places within `radiusM` of a point, from OpenStreetMap. Chains and hype-worded names are dropped. */
