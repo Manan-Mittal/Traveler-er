@@ -11,13 +11,14 @@ export default function Assistant({ tripId, day }: { tripId: string; day: Day })
   const [draft, setDraft] = useState<DraftStop[] | null>(null)
   const [keep, setKeep] = useState<Set<number>>(new Set())
 
-  if (!day.zone) return null
+  const zone = day.zones[0]
+  if (!zone) return null
 
   const ask = async () => {
     setBusy(true)
     setError('')
     try {
-      const stops = await draftDay(day.zone!, interests, 5)
+      const stops = await draftDay(zone, interests, 5)
       setDraft(stops)
       setKeep(new Set(stops.map((_, i) => i)))
       if (stops.length === 0) setError('Nothing found in this zone. Try a longer walk time.')
@@ -74,7 +75,7 @@ export default function Assistant({ tripId, day }: { tripId: string; day: Day })
         <div className="space-y-2">
           <Input aria-label="What are you into?" placeholder="What are you into? e.g. old temples, tea, quiet cafes" value={interests} onChange={(e) => setInterests(e.target.value)} />
           <Btn kind="primary" disabled={busy} onClick={ask}>
-            {busy ? 'Looking…' : `Suggest places near ${day.zone.name}`}
+            {busy ? 'Looking…' : `Suggest places near ${zone.name}`}
           </Btn>
         </div>
       )}

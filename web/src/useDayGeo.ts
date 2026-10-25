@@ -21,7 +21,7 @@ export function useDayGeo(day: Day | undefined): DayGeo {
   const [zoneError, setZoneError] = useState('')
   const [routeError, setRouteError] = useState('')
 
-  const z = day?.zone
+  const z = day?.zones[0]
   useEffect(() => {
     setZone(null)
     setZoneError('')
