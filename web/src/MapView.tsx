@@ -27,6 +27,19 @@ interface Props {
   sheetTop: number
 }
 
+// The idle world map: a dot hops between cities along a dotted trail, then starts over.
+const HOP_CITIES: [number, number][] = [[-122.4, 37.8], [-74, 40.7], [-0.1, 51.5], [55.3, 25.2], [121.5, 25], [139.7, 35.7]]
+const HOP_MS = 1100
+const PAUSE_MS = 450
+const hopArc = (a: [number, number], b: [number, number]): [number, number][] =>
+  Array.from({ length: 31 }, (_, i) => {
+    const t = i / 30
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + Math.sin(Math.PI * t) * Math.min(14, Math.abs(b[0] - a[0]) * 0.25)]
+  })
+const HOP_LEGS = HOP_CITIES.slice(1).map((c, i) => hopArc(HOP_CITIES[i], c))
+const point = (c: [number, number]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })
+const line = (coordinates: [number, number][]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } })
+
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 // Keep in sync with the <aside> classes in App.tsx: a left sidebar on wide or landscape screens, a bottom sheet from 45% down otherwise.
@@ -99,8 +112,17 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.addLayer({ id: 'zone-line', type: 'line', source: 'zone', paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-dasharray': [2, 2] } })
       m.addLayer({ id: 'link-line', type: 'line', source: 'link', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-dasharray': [0.5, 2.5] } })
       m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 4 } })
+      m.addSource('hop-line', { type: 'geojson', data: empty })
+      m.addSource('hop-city', { type: 'geojson', data: empty })
+      m.addSource('hop-dot', { type: 'geojson', data: empty })
+      const hidden = { visibility: 'none' } as const
+      m.addLayer({ id: 'hop-line', type: 'line', source: 'hop-line', layout: { ...hidden, 'line-cap': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 2.5, 'line-dasharray': [0.5, 2.5] } })
+      m.addLayer({ id: 'hop-city', type: 'circle', source: 'hop-city', layout: hidden, paint: { 'circle-radius': 4, 'circle-color': '#fff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2 } })
+      m.addLayer({ id: 'hop-halo', type: 'circle', source: 'hop-dot', layout: hidden, paint: { 'circle-radius': 14, 'circle-color': '#0a84ff', 'circle-opacity': 0.2, 'circle-blur': 0.8 } })
+      m.addLayer({ id: 'hop-dot', type: 'circle', source: 'hop-dot', layout: hidden, paint: { 'circle-radius': 6, 'circle-color': '#0a84ff', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } })
       ready.current = true
       paint()
+      m.fire('hop-ready')
     })
     map.current = m
     return () => {
@@ -110,6 +132,54 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   }, [])
 
   useEffect(paint, [zones, route, links])
+
+  const idle = stops.length === 0 && zones.length === 0 && !center
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    const layers = ['hop-line', 'hop-city', 'hop-halo', 'hop-dot']
+    const show = (v: 'visible' | 'none') => layers.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, 'visibility', v))
+    let raf = 0
+    const run = () => {
+      cancelAnimationFrame(raf)
+      if (!idle) return show('none')
+      show('visible')
+      const src = (id: string) => m.getSource(id) as maplibregl.GeoJSONSource
+      src('hop-city').setData({ type: 'FeatureCollection', features: HOP_CITIES.map(point) })
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (still) {
+        src('hop-line').setData({ type: 'FeatureCollection', features: [line(HOP_LEGS.flat())] })
+        return
+      }
+      const cycle = HOP_LEGS.length * (HOP_MS + PAUSE_MS) + 700
+      const t0 = performance.now()
+      const tick = (now: number) => {
+        const t = Math.max(0, now - t0) % cycle
+        const leg = Math.min(HOP_LEGS.length - 1, Math.floor(t / (HOP_MS + PAUSE_MS)))
+        const within = t - leg * (HOP_MS + PAUSE_MS)
+        const hopping = within < HOP_MS && t < HOP_LEGS.length * (HOP_MS + PAUSE_MS)
+        const k = hopping ? within / HOP_MS : 1
+        const eased = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2
+        const arc = HOP_LEGS[leg]
+        const upto = Math.round(eased * (arc.length - 1))
+        const here = arc[upto]
+        const done = HOP_LEGS.slice(0, leg).flat()
+        src('hop-line').setData({ type: 'FeatureCollection', features: [line([...done, ...arc.slice(0, upto + 1)])] })
+        src('hop-dot').setData({ type: 'FeatureCollection', features: [point(here)] })
+        // The dot squashes as it lands and the halo breathes while it waits.
+        m.setPaintProperty('hop-dot', 'circle-radius', hopping ? 6 : 6 + 2 * Math.sin(((within - HOP_MS) / PAUSE_MS) * Math.PI))
+        m.setPaintProperty('hop-halo', 'circle-radius', hopping ? 14 : 14 + 10 * Math.sin(((within - HOP_MS) / PAUSE_MS) * Math.PI))
+        raf = requestAnimationFrame(tick)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    m.on('hop-ready', run)
+    if (ready.current) run()
+    return () => {
+      cancelAnimationFrame(raf)
+      m.off('hop-ready', run)
+    }
+  }, [idle])
 
   const fitKey = JSON.stringify([stops.map((s) => [s.lat, s.lon]), zones.map((g) => [g.zone.lat, g.zone.lon, !!g.polygon]), center && [center.lat, center.lon], sheetTop])
 
@@ -124,6 +194,27 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       node.style.cssText = `z-index:2;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 13px -apple-system,system-ui;color:#fff;background:${colorOf(s)};border:2px solid ${outside ? '#ff9f0a' : '#fff'};box-shadow:0 2px 8px rgba(0,0,0,.35)`
       return new maplibregl.Marker({ element: node }).setLngLat([s.lon, s.lat]).addTo(m)
     })
+    // Pins that land on top of each other get fanned out into a small ring, and snap back together as you zoom in.
+    const spread = () => {
+      const ms = markers.current
+      const px = ms.map((x) => m.project(x.getLngLat()))
+      const seen = new Set<number>()
+      ms.forEach((x) => x.setOffset([0, 0]))
+      px.forEach((p, i) => {
+        if (seen.has(i)) return
+        const group = px.flatMap((q, j) => (!seen.has(j) && Math.hypot(p.x - q.x, p.y - q.y) < 26 ? [j] : []))
+        group.forEach((j) => seen.add(j))
+        if (group.length < 2) return
+        const r = group.length === 2 ? 15 : 14 + group.length * 3
+        group.forEach((j, k) => {
+          const ang = (2 * Math.PI * k) / group.length - Math.PI / 2 + (group.length === 2 ? Math.PI / 2 : 0)
+          ms[j].setOffset([Math.cos(ang) * r, Math.sin(ang) * r])
+        })
+      })
+    }
+    spread()
+    m.on('zoomend', spread)
+    return () => void m.off('zoomend', spread)
   }, [stops, zones, inZone, colorOf])
 
   // Name tags at the center of each zone.
@@ -164,7 +255,13 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.flyTo({ center: [center.lon, center.lat], zoom: 13, duration: 700 })
     } else {
       // Nothing to show yet: a calm view of the whole world, centered on the part not covered by the panel.
-      m.flyTo({ center: [10, 25], zoom: 1.6, duration: 700 })
+      {
+        // Zoom so the whole hop route (about 275 degrees of longitude) fits in the part of the map the panel leaves free.
+        const pad = panelPadding(m.getContainer().clientWidth, m.getContainer().clientHeight, sheetTop)
+        const free = m.getContainer().clientWidth - pad.left - pad.right - 48
+        const zoom = Math.max(0.3, Math.min(3, Math.log2((free * 360) / (275 * 512))))
+        m.easeTo({ center: [9, 32], zoom, duration: 700 })
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey])
