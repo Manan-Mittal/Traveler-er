@@ -22,6 +22,8 @@ interface Props {
   center?: { lat: number; lon: number }
   inZone: (s: Stop) => boolean | null
   colorOf: (s: Stop) => string
+  /** Where the phone bottom sheet's top edge sits, as a fraction of the height. */
+  sheetTop: number
 }
 
 // Great-circle-ish arcs between far-apart cities, drawn as a dotted route that drifts around the idle globe.
@@ -47,12 +49,12 @@ const worldCities: GeoJSON.FeatureCollection = {
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 // Keep in sync with the <aside> classes in App.tsx: a left sidebar on wide or landscape screens, a bottom sheet from 45% down otherwise.
-const panelPadding = (w: number, h: number) =>
+const panelPadding = (w: number, h: number, sheetTop: number) =>
   w >= 768 || w > h
     ? { top: 0, bottom: 0, left: Math.min(400, w * 0.5) + 12, right: 0 }
-    : { top: 0, bottom: Math.round(h * 0.55), left: 0, right: 0 }
+    : { top: 0, bottom: Math.round(h * (1 - sheetTop)), left: 0, right: 0 }
 
-export default function MapView({ stops, zones, route, links, center, inZone, colorOf }: Props) {
+export default function MapView({ stops, zones, route, links, center, inZone, colorOf, sheetTop }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const markers = useRef<maplibregl.Marker[]>([])
@@ -88,8 +90,10 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       style: style(),
       center: [10, 22],
       zoom: 1.3,
-      attributionControl: { compact: true },
+      attributionControl: false,
     })
+    // On a phone held upright the bottom sheet covers the bottom edge, so the credit sits at the top instead.
+    m.addControl(new maplibregl.AttributionControl({ compact: true }), el.current!.clientWidth < 768 && el.current!.clientHeight > el.current!.clientWidth ? 'top-left' : 'bottom-right')
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     // Start with the attribution folded to its "i" button; it still opens on tap, as the map data licenses require.
     const foldAttribution = () => {
@@ -165,7 +169,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       g.polygon?.geometry.coordinates[0].forEach((c) => pts.push([c[0], c[1]]))
     }
     // The map keeps this padding, so later camera moves center on the visible part rather than under the panel.
-    m.setPadding(panelPadding(m.getContainer().clientWidth, m.getContainer().clientHeight))
+    m.setPadding(panelPadding(m.getContainer().clientWidth, m.getContainer().clientHeight, sheetTop))
     if (pts.length > 1) {
       const b = new maplibregl.LngLatBounds(pts[0], pts[0])
       pts.forEach((p) => b.extend(p))
@@ -204,15 +208,15 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     }
     s.raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(s.raf)
-  }, [stops, zones, center])
+  }, [stops, zones, center, sheetTop])
 
   // maplibre's own CSS forces position: relative on the map element, so the absolute layer lives on a wrapper.
   return (
     <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 60% 40%, #1c2b4a 0%, #0b1220 70%)' }}>
       <div ref={el} className="h-full w-full" />
       {onGlobe && (
-        <div className="pointer-events-none absolute inset-x-0 top-8 hidden text-center text-white md:block md:pl-[400px]">
-          <div className="text-[34px] font-bold tracking-tight drop-shadow">Where to next?</div>
+        <div className="pointer-events-none absolute inset-x-0 top-[max(3rem,env(safe-area-inset-top))] px-6 text-center text-white md:top-8 md:pl-[400px] landscape:pl-[min(400px,50%)]">
+          <div className="text-[26px] font-bold tracking-tight drop-shadow md:text-[34px]">Where to next?</div>
           <div className="mt-1 text-[15px] opacity-70">Plan every day around the places you can walk.</div>
         </div>
       )}

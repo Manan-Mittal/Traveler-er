@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 export const Btn = ({ kind = 'plain', className = '', ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { kind?: 'plain' | 'primary' | 'ghost' }) => (
   <button
     {...p}
-    className={`rounded-full px-4 py-2 text-[14px] font-medium transition active:scale-[0.97] disabled:opacity-40 ${
+    className={`rounded-full px-4 py-2 text-[14px] font-medium transition pointer-coarse:min-h-11 active:scale-[0.97] disabled:opacity-40 ${
       kind === 'primary' ? 'bg-[var(--accent)] text-white' : kind === 'ghost' ? 'text-[var(--accent)]' : 'bg-[var(--accent-soft)] text-[var(--accent)]'
     } ${className}`}
   />
