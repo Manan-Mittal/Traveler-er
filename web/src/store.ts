@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { Booking, City, Day, Stop, Trip, Zone } from './types'
-import { sampleTrip } from './sample'
+import { fetchSample, sampleTrip } from './sample'
 import { distanceKm } from './geo'
 
 const KEY = 'traveler-er:v1'
@@ -160,9 +160,9 @@ export const actions = {
     set({ trips: [trip, ...state.trips], tripId: trip.id, dayId: days[0]?.id ?? null })
     return trip.id
   },
-  /** Adds an editable copy of the built-in Taiwan sample trip and opens it. */
-  addSampleTrip() {
-    const trip = sampleTrip()
+  /** Adds an editable copy of the Taiwan sample trip (signed-in only) and opens it. */
+  async addSampleTrip() {
+    const trip = sampleTrip(await fetchSample())
     set({ trips: [trip, ...state.trips], tripId: trip.id, dayId: trip.days[0].id })
   },
   deleteTrip(id: string) {

@@ -5,9 +5,12 @@ import { agentRoute } from './agents/orchestrator.ts'
 import { HttpError, createSession, endSession, requireUser, verifyGoogleToken } from './auth.ts'
 import { overQuota, type DbEnv } from './db.ts'
 import { deleteTrip, listTrips, putTrip } from './trips.ts'
+import { SAMPLE } from './sample.ts'
 
 export interface Env extends AiEnv, DbEnv {
   GOOGLE_CLIENT_ID: string
+  /** Optional comma-separated emails allowed to open the Taiwan sample. Empty means any signed-in user. */
+  SAMPLE_EMAILS?: string
 }
 
 const hits = new Map<string, number[]>()
@@ -80,6 +83,12 @@ export default {
       const user = await requireUser(env, req)
 
       if (url.pathname === '/api/me' && req.method === 'GET') return json({ user })
+
+      if (url.pathname === '/api/sample' && req.method === 'GET') {
+        const only = (env.SAMPLE_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+        if (only.length && !only.includes(user.email.toLowerCase())) throw new HttpError(403, 'not allowed')
+        return json(SAMPLE)
+      }
 
       if (url.pathname === '/api/trips' && req.method === 'GET') return json({ trips: await listTrips(env, user) })
       if (trip && (req.method === 'PUT' || req.method === 'DELETE')) {

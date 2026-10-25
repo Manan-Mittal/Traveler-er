@@ -36,7 +36,7 @@ export default function Search({ near, placeholder, onPick }: { near?: { lat: nu
   return (
     <div className="relative">
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} aria-label={placeholder} onKeyDown={(e) => e.key === 'Enter' && results[0] && pick(results[0])} />
-      {empty && <p className="mt-1 text-[12px] text-[var(--text-2)]">No places found.</p>}
+      {empty && <p className="mt-1 text-[12px] text-[var(--text-2)]">No places found. Not on OpenStreetMap? Paste its Google Maps link here.</p>}
       {error && <p className="mt-1 text-[12px] text-[var(--danger)]">{error}</p>}
       {results.length > 0 && (
         <div className="mt-2 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface-solid)]">

@@ -1,5 +1,6 @@
 import { cachedJson } from './cache'
 import type { Category } from '../types'
+import { coordsFromUrl } from '../import/takeout'
 
 export interface Place {
   name: string
@@ -28,10 +29,11 @@ export const categoryOf = (key = '', value = ''): Category => {
 export async function searchPlaces(q: string, near?: { lat: number; lon: number }): Promise<Place[]> {
   const query = q.trim()
   if (query.length < 2) return []
+  if (/^https?:\/\/\S*(google\.[a-z.]+\/maps|goo\.gl|maps\.app)/i.test(query)) return fromGoogleLink(query)
   const bias = near ? `&lat=${near.lat.toFixed(2)}&lon=${near.lon.toFixed(2)}` : ''
-  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8${bias}`
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lang=en${bias}`
   const data = await cachedJson(
-    `geo:${query.toLowerCase()}:${near ? near.lat.toFixed(1) + near.lon.toFixed(1) : ''}`,
+    `geo-en:${query.toLowerCase()}:${near ? near.lat.toFixed(1) + near.lon.toFixed(1) : ''}`,
     24 * 3600 * 1000,
     async () => {
       const r = await fetch(url)
@@ -53,4 +55,17 @@ export async function searchPlaces(q: string, near?: { lat: number; lon: number 
         category: categoryOf(p.osm_key, p.osm_value),
       }
     })
+}
+
+/** A pasted Google Maps place link becomes a single pin, for spots OpenStreetMap doesn't have. */
+function fromGoogleLink(link: string): Place[] {
+  const at = coordsFromUrl(link)
+  if (!at) throw new Error('That link has no location in it. Open it in Google Maps and copy the full link from the address bar.')
+  let name = 'Pinned from Google Maps'
+  try {
+    name = decodeURIComponent(link.match(/\/place\/([^/@?]+)/)?.[1] ?? '').replace(/\+/g, ' ').trim() || name
+  } catch {
+    // keep the default name
+  }
+  return [{ name, detail: 'From your Google Maps link', ...at, category: 'other' }]
 }
