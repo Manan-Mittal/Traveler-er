@@ -20,16 +20,16 @@ export default function App() {
   return (
     <div className="relative h-full w-full overflow-hidden">
       <MapView stops={day?.stops ?? []} zone={geo.zone} route={route} center={center} inZone={geo.inZone} />
-      <aside className="glass absolute inset-x-3 bottom-3 top-[45%] overflow-y-auto p-5 md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:w-[400px]">
+      <aside className="glass absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] top-[45%] overflow-y-auto overflow-x-hidden p-5 landscape:inset-x-auto landscape:bottom-[max(0.75rem,env(safe-area-inset-bottom))] landscape:left-[max(0.75rem,env(safe-area-inset-left))] landscape:top-3 landscape:w-[min(400px,50%)] md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:w-[400px]">
         {!trip ? (
           <TripList trips={trips} />
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Btn kind="ghost" className="-ml-3" onClick={() => actions.openTrip(null)}>
+              <Btn kind="ghost" className="-ml-3" onClick={() => (setTab('days'), actions.openTrip(null))}>
                 ‹ Trips
               </Btn>
-              <Btn kind="ghost" onClick={() => confirm(`Delete ${trip.name}?`) && actions.deleteTrip(trip.id)}>
+              <Btn kind="ghost" onClick={() => confirm(`Delete ${trip.name}?`) && (setTab('days'), actions.deleteTrip(trip.id))}>
                 Delete
               </Btn>
             </div>

@@ -19,7 +19,8 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
         <input
           value={day.title}
           onChange={(e) => actions.patchDay(tripId, day.id, { title: e.target.value })}
-          className="w-full bg-transparent text-[22px] font-bold tracking-tight outline-none"
+          aria-label="Day title"
+          className="w-full rounded-lg bg-transparent text-[22px] font-bold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
         />
         <Sub>{day.date}</Sub>
       </div>
@@ -38,6 +39,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
               {WALK_CHOICES.map((m) => (
                 <Btn
                   key={m}
+                  className="flex-1 whitespace-nowrap px-2"
                   kind={day.zone!.walkMinutes === m ? 'primary' : 'plain'}
                   onClick={() => actions.patchDay(tripId, day.id, { zone: { ...day.zone!, walkMinutes: m } })}
                 >
@@ -46,7 +48,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
               ))}
             </div>
             <Sub>
-              {geo.zone ? 'Shaded area is everything within a walk of the center.' : 'Loading walk area…'}
+              {geo.zone ? 'Shaded area is everything within a walk of the center.' : geo.zoneError ? `Couldn't load the walk area right now: ${geo.zoneError}.` : 'Loading walk area…'}
               {outside > 0 && ` ${outside} stop${outside > 1 ? 's are' : ' is'} outside it (orange pins).`}
             </Sub>
           </div>
@@ -59,7 +61,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
         )}
       </section>
 
-      <Assistant tripId={tripId} day={day} />
+      <Assistant key={day.zone ? `${day.zone.lat},${day.zone.lon},${day.zone.walkMinutes}` : 'none'} tripId={tripId} day={day} />
 
       <section className="space-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]">
@@ -70,7 +72,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
             <div key={s.id}>
               {i > 0 && (
                 <div className="ml-4 border-l-2 border-dashed border-[var(--line)] py-1.5 pl-5 text-[12px] text-[var(--text-2)]">
-                  {geo.legs[i - 1] ? `🚶 ${geo.legs[i - 1]!.minutes} min · ${geo.legs[i - 1]!.km} km` : '🚶 …'}
+                  {geo.legs[i - 1] ? `🚶 ${geo.legs[i - 1]!.minutes} min · ${geo.legs[i - 1]!.km} km` : geo.routeError ? '🚶 walk time unavailable' : '🚶 …'}
                   {geo.transit[i - 1] && (
                     <span className="ml-3">
                       🚆 ~{geo.transit[i - 1]!.minutes + TRANSIT_BUFFER_MIN} min
@@ -89,9 +91,9 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
                   </div>
                   {s.why && <Sub>{s.why}</Sub>}
                 </div>
-                <button className="px-1 text-[var(--text-2)] disabled:opacity-20" disabled={i === 0} onClick={() => actions.moveStop(tripId, day.id, i, i - 1)}>↑</button>
-                <button className="px-1 text-[var(--text-2)] disabled:opacity-20" disabled={i === day.stops.length - 1} onClick={() => actions.moveStop(tripId, day.id, i, i + 1)}>↓</button>
-                <button className="px-1 text-[var(--text-2)]" onClick={() => actions.removeStop(tripId, day.id, s.id)}>✕</button>
+                <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${s.name} up`} disabled={i === 0} onClick={() => actions.moveStop(tripId, day.id, i, i - 1)}>↑</button>
+                <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${s.name} down`} disabled={i === day.stops.length - 1} onClick={() => actions.moveStop(tripId, day.id, i, i + 1)}>↓</button>
+                <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)]" aria-label={`Remove ${s.name}`} onClick={() => actions.removeStop(tripId, day.id, s.id)}>✕</button>
               </Row>
             </div>
           ))}
@@ -101,7 +103,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
           placeholder="Add a place"
           onPick={(p) => actions.addStop(tripId, day.id, { name: p.name, lat: p.lat, lon: p.lon, category: p.category, notes: '', source: 'user' })}
         />
-        {geo.error && <p className="text-[12px] text-[var(--danger)]">{geo.error}</p>}
+        {geo.routeError && <p className="text-[12px] text-[var(--danger)]">Couldn't get walking times right now: {geo.routeError}.</p>}
       </section>
     </div>
   )

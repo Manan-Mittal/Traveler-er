@@ -19,7 +19,7 @@ export const Row = ({ children, onClick }: { children: ReactNode; onClick?: () =
 )
 
 export const Title = ({ children }: { children: ReactNode }) => (
-  <h1 className="text-[28px] font-bold leading-tight tracking-tight">{children}</h1>
+  <h1 className="text-[28px] font-bold leading-tight tracking-tight break-words">{children}</h1>
 )
 
 export const Sub = ({ children }: { children: ReactNode }) => <p className="text-[13px] text-[var(--text-2)]">{children}</p>
@@ -27,7 +27,7 @@ export const Sub = ({ children }: { children: ReactNode }) => <p className="text
 export const Input = (p: React.InputHTMLAttributes<HTMLInputElement>) => (
   <input
     {...p}
-    className={`w-full rounded-xl bg-[var(--accent-soft)] px-3.5 py-2.5 text-[15px] outline-none placeholder:text-[var(--text-2)] focus:ring-2 focus:ring-[var(--accent)] ${p.className ?? ''}`}
+    className={`w-full rounded-xl bg-[var(--accent-soft)] px-3.5 py-2.5 text-[16px] outline-none placeholder:text-[var(--text-2)] focus:ring-2 focus:ring-[var(--accent)] ${p.className ?? ''}`}
   />
 )
 

@@ -5,7 +5,7 @@ const BASE = 'https://valhalla1.openstreetmap.de'
 type LngLat = [number, number]
 
 /** Area you can reach on foot within `minutes`, as a GeoJSON polygon. */
-export async function walkZone(lat: number, lon: number, minutes: number): Promise<GeoJSON.Feature<GeoJSON.Polygon> | null> {
+export async function walkZone(lat: number, lon: number, minutes: number, signal?: AbortSignal): Promise<GeoJSON.Feature<GeoJSON.Polygon> | null> {
   const json = {
     locations: [{ lat, lon }],
     costing: 'pedestrian',
@@ -18,12 +18,13 @@ export async function walkZone(lat: number, lon: number, minutes: number): Promi
     `iso:${lat.toFixed(4)},${lon.toFixed(4)},${minutes}`,
     30 * 24 * 3600 * 1000,
     async () => {
-      const r = await fetch(`${BASE}/isochrone?json=${encodeURIComponent(JSON.stringify(json))}`)
+      const r = await fetch(`${BASE}/isochrone?json=${encodeURIComponent(JSON.stringify(json))}`, { signal })
       if (!r.ok) throw new Error(`Walk zone failed (${r.status})`)
       return (await r.json()) as GeoJSON.FeatureCollection<GeoJSON.Polygon>
     },
     'valhalla',
     1100,
+    signal,
   )
   return data.features[0] ?? null
 }
@@ -55,7 +56,7 @@ function decode(str: string): LngLat[] {
   return out
 }
 
-export async function walkLeg(a: { lat: number; lon: number }, b: { lat: number; lon: number }): Promise<Leg> {
+export async function walkLeg(a: { lat: number; lon: number }, b: { lat: number; lon: number }, signal?: AbortSignal): Promise<Leg> {
   const json = {
     locations: [
       { lat: a.lat, lon: a.lon },
@@ -67,12 +68,13 @@ export async function walkLeg(a: { lat: number; lon: number }, b: { lat: number;
     `walk:${a.lat.toFixed(5)},${a.lon.toFixed(5)}>${b.lat.toFixed(5)},${b.lon.toFixed(5)}`,
     30 * 24 * 3600 * 1000,
     async () => {
-      const r = await fetch(`${BASE}/route?json=${encodeURIComponent(JSON.stringify(json))}`)
+      const r = await fetch(`${BASE}/route?json=${encodeURIComponent(JSON.stringify(json))}`, { signal })
       if (!r.ok) throw new Error(`Route failed (${r.status})`)
       return (await r.json()) as { trip: { summary: { time: number; length: number }; legs: { shape: string }[] } }
     },
     'valhalla',
     1100,
+    signal,
   )
   return {
     minutes: Math.max(1, Math.round(data.trip.summary.time / 60)),
