@@ -93,7 +93,8 @@ let onError: (msg: string) => void = () => {}
 export async function renderSignIn(el: HTMLElement, error: (msg: string) => void) {
   onError = error
   const g = await loadGsi()
-  g.accounts.id.renderButton(el, { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', logo_alignment: 'left' })
+  // A fixed width, or Google redraws it wider/narrower once it recognises the account and the layout jumps.
+  g.accounts.id.renderButton(el, { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', logo_alignment: 'left', width: 260 })
 }
 
 /** Trades Google's ID token for a Traveler-er session; the worker verifies the token with Google's keys. */

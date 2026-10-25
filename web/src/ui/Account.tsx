@@ -19,16 +19,17 @@ export default function Account() {
   if (!signInEnabled) return null
   if (!session)
     return (
-      <div className="space-y-2 rounded-2xl bg-[var(--accent-soft)] p-3">
+      // Distinct keys so React never reuses this DOM for the signed-in row: Google fills the button div itself, and a reused div kept its button.
+      <div key="signed-out" className="space-y-2 rounded-2xl bg-[var(--accent-soft)] p-3">
         <Sub>Sign in to save trips to your account, open them on any device, and use the assistant. Trips already in this browser come with you.</Sub>
         {/* Google draws the button in an iframe; a light color-scheme stops it getting a white box in dark mode. */}
-        <div ref={button} className="min-h-[44px]" style={{ colorScheme: "light" }} />
+        <div ref={button} className="min-h-[44px] w-[260px] max-w-full" style={{ colorScheme: "light" }} />
         {error && <p className="text-[12px] text-[var(--danger)]">{error}</p>}
       </div>
     )
   const { user } = session
   return (
-    <div className="flex items-center gap-3">
+    <div key="signed-in" className="flex items-center gap-3">
       {user.picture ? (
         <img src={user.picture} alt="" referrerPolicy="no-referrer" className="h-8 w-8 shrink-0 rounded-full" />
       ) : (
