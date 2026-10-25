@@ -93,5 +93,10 @@ export default function MapView({ stops, zone, route, center, inZone }: Props) {
     }
   }, [stops, zone, center])
 
-  return <div ref={el} className="absolute inset-0" />
+  // maplibre's own CSS forces position: relative on the map element, so the absolute layer lives on a wrapper.
+  return (
+    <div className="absolute inset-0">
+      <div ref={el} className="h-full w-full" />
+    </div>
+  )
 }
