@@ -14,6 +14,30 @@ const categoryOf = (t: Record<string, string>) => {
   return 'sight'
 }
 
+const MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+]
+
+/** Public Overpass servers get overloaded often, so try each mirror in turn before giving up. */
+async function overpass(query: string): Promise<Osm> {
+  for (const url of MIRRORS) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        body: 'data=' + encodeURIComponent(query),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (r.ok) return (await r.json()) as Osm
+    } catch {
+      // timed out or unreachable: try the next mirror
+    }
+  }
+  throw new Error('The free map data servers are busy right now. Please try again in a minute.')
+}
+
 /** Real places within `radiusM` of a point, from OpenStreetMap. Chains and hype-worded names are dropped. */
 export async function scout(lat: number, lon: number, radiusM: number): Promise<Candidate[]> {
   const around = `(around:${radiusM},${lat},${lon})`
@@ -24,9 +48,7 @@ export async function scout(lat: number, lon: number, radiusM: number): Promise<
     nwr[leisure~"^(park|garden)$"][name]${around};
     nwr[natural~"^(peak|beach|waterfall|hot_spring)$"][name]${around};
   );out center 300;`
-  const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(query), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
-  if (!r.ok) throw new Error(`map data unavailable (${r.status})`)
-  const data = (await r.json()) as Osm
+  const data = await overpass(query)
   const out: Candidate[] = []
   for (const e of data.elements) {
     const t = e.tags ?? {}
