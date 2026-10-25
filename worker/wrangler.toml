@@ -12,6 +12,6 @@ GOOGLE_CLIENT_ID = "862290647282-deke61u74jr7aruqlp1h5l5gpjpgbnro.apps.googleuse
 [[d1_databases]]
 binding = "DB"
 database_name = "traveler-er"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "38c2486f-ab85-46f9-b866-ecdaac8b7857"
 
 # Secret, set with: npx wrangler secret put OPENROUTER_API_KEY
