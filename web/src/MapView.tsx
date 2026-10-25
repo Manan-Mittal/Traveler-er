@@ -5,6 +5,8 @@ import type { ZoneGeo } from './useDayGeo'
 
 import { isDark } from './theme'
 import { onFocusMap } from './focus'
+import { useLang } from './lang'
+import { onTranslated, translation } from './services/translate'
 
 const style = () => `https://tiles.openfreemap.org/styles/${isDark() ? 'dark' : 'positron'}`
 
@@ -84,6 +86,9 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   const ready = useRef(false)
   const plane = useRef<maplibregl.Marker | null>(null)
   const [tilesDown, setTilesDown] = useState(false)
+  const { lang } = useLang()
+  const [translated, setTranslated] = useState(0)
+  useEffect(() => onTranslated(() => setTranslated((n) => n + 1)), [])
   const latest = useRef({ zones, route, links, world })
   latest.current = { zones, route, links, world }
 
@@ -346,7 +351,8 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     labels.current.forEach((x) => x.remove())
     labels.current = zones.map((g) => {
       const node = document.createElement('div')
-      node.textContent = g.zone.name
+      const local = translation(g.zone.name, lang)
+      node.textContent = local ? `${local} ${g.zone.name}` : g.zone.name
       node.style.cssText = `pointer-events:none;z-index:1;padding:3px 10px;border-radius:999px;font:600 12px -apple-system,system-ui;color:#fff;background:${g.color};box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis`
       // Stops often sit right at the zone center, so the tag hangs off the top of the walk area (or above the center until it loads).
       const ring = g.polygon?.geometry.coordinates[0]
@@ -355,7 +361,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
         .setLngLat(top ? [g.zone.lon, top[1]] : [g.zone.lon, g.zone.lat])
         .addTo(m)
     })
-  }, [zones])
+  }, [zones, lang, translated])
 
   useEffect(() => {
     const m = map.current

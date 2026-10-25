@@ -7,6 +7,7 @@ import { DateRangePicker } from './DatePicker'
 import ImportList from './ImportList'
 import Account from './Account'
 import { useSession } from '../auth'
+import { LANGUAGES, setLang, useLang } from '../lang'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 
 const MAX_DAYS = 366
@@ -21,6 +22,7 @@ export default function TripList({ trips, onWorld }: { trips: Trip[]; onWorld: (
   const [msg, setMsg] = useState('')
   const [importing, setImporting] = useState(false)
   const session = useSession()
+  const { chosen, lang } = useLang()
   const length = start && end ? differenceInCalendarDays(parseISO(end), parseISO(start)) + 1 : 0
   const tooLong = length > MAX_DAYS
   const valid = name.trim() && start && end && end >= start && !tooLong
@@ -39,6 +41,19 @@ export default function TripList({ trips, onWorld }: { trips: Trip[]; onWorld: (
         </span>
         <span className="text-[var(--text-2)]">›</span>
       </button>
+      <label className="flex items-center justify-between gap-3 text-[13px] text-[var(--text-2)]">
+        <span>Show place names in</span>
+        <select
+          value={chosen}
+          onChange={(e) => setLang(e.target.value)}
+          className="min-h-9 rounded-lg bg-[var(--accent-soft)] px-2 text-[14px] text-[var(--text)] pointer-coarse:min-h-11"
+        >
+          <option value="">Automatic ({LANGUAGES.find(([c]) => c === lang)?.[1]})</option>
+          {LANGUAGES.map(([c, label]) => (
+            <option key={c} value={c}>{label}</option>
+          ))}
+        </select>
+      </label>
       <Title>Trips</Title>
       {trips.length === 0 && !adding && <Sub>Plan your first trip. Each day gets its own walkable zone on the map.</Sub>}
       <div>

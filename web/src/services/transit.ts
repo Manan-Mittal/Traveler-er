@@ -1,5 +1,6 @@
 import { cachedJson } from './cache'
 import { decode } from './valhalla'
+import { lang } from '../lang'
 
 interface RawLeg {
   mode?: string
@@ -110,14 +111,17 @@ async function lookup(
     time,
     numItineraries: '1',
   })
-  const key = `transit:${a.lat.toFixed(4)},${a.lon.toFixed(4)}>${b.lat.toFixed(4)},${b.lon.toFixed(4)}:${date}`
+  // Feeds with translations return stop and line names in this language; the rest come back as published.
+  const language = lang()
+  const key = `transit:${a.lat.toFixed(4)},${a.lon.toFixed(4)}>${b.lat.toFixed(4)},${b.lon.toFixed(4)}:${date}:${language}`
   if (Date.now() - (failedAt.get(key) ?? 0) < RETRY_AFTER_MS) return null
   try {
     const data = await cachedJson(
-      `transit:${a.lat.toFixed(4)},${a.lon.toFixed(4)}>${b.lat.toFixed(4)},${b.lon.toFixed(4)}:${date}`,
+      key,
       7 * 24 * 3600 * 1000,
       async () => {
-        const r = await fetch(`https://api.transitous.org/api/v5/plan?${params}`)
+        let r = await fetch(`https://api.transitous.org/api/v5/plan?${params}&language=${encodeURIComponent(language)}`)
+        if (r.status === 400) r = await fetch(`https://api.transitous.org/api/v5/plan?${params}`)
         if (!r.ok) throw new Error(`Transit failed (${r.status})`)
         return (await r.json()) as { itineraries?: Itinerary[] }
       },

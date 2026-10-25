@@ -1,6 +1,7 @@
 import { cachedJson } from './cache'
 import type { Category } from '../types'
 import { coordsFromUrl } from '../import/takeout'
+import { lang } from '../lang'
 
 export interface Place {
   name: string
@@ -31,9 +32,11 @@ export async function searchPlaces(q: string, near?: { lat: number; lon: number 
   if (query.length < 2) return []
   if (/^https?:\/\/\S*(google\.[a-z.]+\/maps|goo\.gl|maps\.app)/i.test(query)) return fromGoogleLink(query)
   const bias = near ? `&lat=${near.lat.toFixed(2)}&lon=${near.lon.toFixed(2)}` : ''
-  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lang=en${bias}`
+  // Photon only knows a few languages; other names stay English and get translated on screen if needed.
+  const l = ['de', 'fr'].includes(lang()) ? lang() : 'en'
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lang=${l}${bias}`
   const data = await cachedJson(
-    `geo-en:${query.toLowerCase()}:${near ? near.lat.toFixed(1) + near.lon.toFixed(1) : ''}`,
+    `geo-${l}:${query.toLowerCase()}:${near ? near.lat.toFixed(1) + near.lon.toFixed(1) : ''}`,
     24 * 3600 * 1000,
     async () => {
       const r = await fetch(url)

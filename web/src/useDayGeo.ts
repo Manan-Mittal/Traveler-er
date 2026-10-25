@@ -4,6 +4,7 @@ import { driveLeg, walkLeg, walkZone, type Leg } from './services/valhalla'
 import { inPolygon } from './geo'
 import { TRANSIT_BUFFER_MIN, transitMinutes, type TransitLeg } from './services/transit'
 import { orderedStops, zoneColor, zoneIdOf } from './zones'
+import { useLang } from './lang'
 
 export interface ZoneGeo {
   zone: Zone
@@ -51,7 +52,8 @@ export function useDayGeo(day: Day | undefined): DayGeo {
     return () => ctl.abort()
   }, [areaKey])
 
-  const linkKey = keyOf(day, (z) => [z.lat, z.lon, z.arriveBy ?? 'transit']) + (day?.date ?? '')
+  const { lang } = useLang()
+  const linkKey = keyOf(day, (z) => [z.lat, z.lon, z.arriveBy ?? 'transit']) + (day?.date ?? '') + lang
   useEffect(() => {
     setLinkState({})
     if (!day) return
