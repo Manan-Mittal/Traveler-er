@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { actions } from '../store'
 import type { Trip, Zone } from '../types'
 import { assistantEnabled } from '../services/assistant'
@@ -76,6 +76,9 @@ export default function Planner({ trip }: { trip: Trip }) {
   const [rejected, setRejected] = useState<Fill['rejected']>([])
   const [off, setOff] = useState<Set<string>>(new Set())
   const abort = useRef<AbortController | null>(null)
+  const top = useRef<HTMLDivElement>(null)
+  // Each step starts at its top, not wherever the last one was scrolled to.
+  useEffect(() => top.current?.scrollIntoView({ block: 'nearest' }), [phase])
 
   const toggle = (k: string) => setOff((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set(s).add(k)))
   const onStep = (s: Step) => setSteps((x) => [...x, s])
@@ -170,11 +173,13 @@ export default function Planner({ trip }: { trip: Trip }) {
   }
 
   if (!assistantEnabled) return <Sub>The planner isn't connected yet.</Sub>
+  const anchor = <div ref={top} className="scroll-mt-16" />
 
   // ---------- 1. Ask ----------
   if (phase === 'ask')
     return (
       <section className="space-y-4">
+        {anchor}
         <div className="space-y-1">
           <h2 className="text-[20px] font-bold tracking-tight">Plan with AI</h2>
           <Sub>A team of agents picks neighborhoods to walk, real local places, what to book and how to get between cities. You approve every change.</Sub>
@@ -221,6 +226,7 @@ export default function Planner({ trip }: { trip: Trip }) {
   if (phase === 'outlining' || phase === 'filling')
     return (
       <section className="space-y-4">
+        {anchor}
         <h2 className="text-[20px] font-bold tracking-tight">{phase === 'outlining' ? 'Sketching your days' : 'Finding places'}</h2>
         <Searching />
         <Trace steps={steps} live />
@@ -235,6 +241,7 @@ export default function Planner({ trip }: { trip: Trip }) {
     const count = zones.filter((z) => !off.has(`z:${z.key}`)).length
     return (
       <section className="space-y-4">
+        {anchor}
         <div className="space-y-1">
           <h2 className="text-[20px] font-bold tracking-tight">Where to walk</h2>
           <Sub>Untick any area you don't want. Nothing is added yet.</Sub>
@@ -287,6 +294,7 @@ export default function Planner({ trip }: { trip: Trip }) {
   const newZones = zones.filter((z) => !z.existing && !off.has(`z:${z.key}`)).length
   return (
     <section className="space-y-4">
+      {anchor}
       <div className="space-y-1">
         <h2 className="text-[20px] font-bold tracking-tight">Review the plan</h2>
         <Sub>Every place is a real spot from open map data, checked by the critic. Untick anything you don't want.</Sub>
