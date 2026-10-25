@@ -7,6 +7,7 @@ import { modeLabel } from '../services/transit'
 import { Row, Segmented, Sub, icon } from './kit'
 import { formatDay } from '../format'
 import { focusMap } from '../focus'
+import LocalName from './LocalName'
 
 const WALK_CHOICES = [15, 30, 45, 60] as const
 
@@ -29,7 +30,7 @@ function LinkPill({ tripId, dayId, zone, from, link, fromColor, toColor }: { tri
           <span className="min-w-0 flex-1">{text}</span>
         </div>
         <Sub>
-          {from.name} → {zone.name}
+          <LocalName text={from.name} /> → <LocalName text={zone.name} />
         </Sub>
         {link && link !== 'none' && link.legs && link.legs.length > 0 && (
           <ol className="mt-2 space-y-1.5" aria-label="Transit steps">
@@ -37,8 +38,14 @@ function LinkPill({ tripId, dayId, zone, from, link, fromColor, toColor }: { tri
               <li key={i} className="flex gap-2 text-[13px]">
                 <span aria-hidden className="w-4 shrink-0 text-center">{l.mode === 'WALK' ? '🚶' : l.mode === 'FERRY' ? '⛴️' : l.mode.includes('RAIL') || l.mode === 'SUBWAY' || l.mode === 'METRO' || l.mode === 'TRAM' ? '🚆' : '🚌'}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="font-medium">{l.mode === 'WALK' ? 'Walk' : `${modeLabel(l.mode)}${l.line ? ` · ${l.line}` : ''}`}</span>
-                  <span className="text-[var(--text-2)]"> · {l.minutes} min{l.mode !== 'WALK' && l.from && l.to ? ` · ${l.from} → ${l.to}` : ''}</span>
+                  <span className="font-medium">
+                    {l.mode === 'WALK' ? 'Walk' : modeLabel(l.mode)}
+                    {l.mode !== 'WALK' && l.line && <> · <LocalName text={l.line} /></>}
+                  </span>
+                  <span className="text-[var(--text-2)]">
+                    {' '}· {l.minutes} min
+                    {l.mode !== 'WALK' && l.from && l.to && <> · <LocalName text={l.from} /> → <LocalName text={l.to} /></>}
+                  </span>
                 </span>
               </li>
             ))}
@@ -93,7 +100,7 @@ function StopRow({ tripId, day, geo, stop, index, group, city }: { tripId: strin
       </span>
       <div className="min-w-0 flex-1">
         <div className="line-clamp-2 text-[15px] font-medium leading-snug">
-          {icon[stop.category]} {stop.name}
+          {icon[stop.category]} <LocalName text={stop.name} />
         </div>
         {stop.why && <Sub>{stop.why}</Sub>}
         {stop.category !== 'transit' && <ReviewLinks stop={stop} city={city} />}
@@ -115,7 +122,7 @@ function ZoneCard({ trip, day, geo, index }: { trip: Trip; day: Day; geo: DayGeo
     <section className="rounded-2xl border border-[var(--line)] p-4" style={{ borderLeft: `4px solid ${g.color}` }} aria-label={`Area ${index + 1}: ${zone.name}`}>
       <div className="flex items-center gap-2">
         <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color }} />
-        <h3 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight">{zone.name}</h3>
+        <h3 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight"><LocalName text={zone.name} /></h3>
         {day.zones.length > 1 && (
           <>
             <button className="h-11 w-11 rounded-lg pointer-fine:h-8 pointer-fine:w-8 text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${zone.name} earlier`} disabled={index === 0} onClick={() => actions.moveZone(trip.id, day.id, index, index - 1)}>↑</button>

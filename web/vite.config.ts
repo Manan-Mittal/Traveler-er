@@ -21,7 +21,7 @@ const csp = (api: string): Plugin => ({
         "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data:",
-        `connect-src 'self' ${api} https://tiles.openfreemap.org https://photon.komoot.io https://valhalla1.openstreetmap.de https://api.transitous.org https://accounts.google.com/gsi/`,
+        `connect-src 'self' ${api} https://tiles.openfreemap.org https://photon.komoot.io https://valhalla1.openstreetmap.de https://api.transitous.org https://api.mymemory.translated.net https://accounts.google.com/gsi/`,
         'frame-src https://accounts.google.com/gsi/',
         "worker-src 'self' blob:",
         "child-src 'self' blob:",

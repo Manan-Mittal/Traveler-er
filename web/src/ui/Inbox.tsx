@@ -3,6 +3,7 @@ import { actions } from '../store'
 import type { Day, Trip } from '../types'
 import { distanceKm } from '../geo'
 import { Sub, icon } from './kit'
+import LocalName from './LocalName'
 
 const SHOW = 6
 
@@ -34,10 +35,10 @@ export default function Inbox({ trip, day }: { trip: Trip; day?: Day }) {
               <div className="truncate text-[15px] font-medium">
                 {s.url ? (
                   <a href={s.url} target="_blank" rel="noreferrer">
-                    {s.name}
+                    <LocalName text={s.name} />
                   </a>
                 ) : (
-                  s.name
+                  <LocalName text={s.name} />
                 )}
               </div>
               <div className="truncate text-[12px] text-[var(--text-2)]">{[cityName(s.cityId), s.listName, s.notes].filter(Boolean).join(' · ')}</div>
