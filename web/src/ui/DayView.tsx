@@ -9,7 +9,8 @@ import { Btn, Row, Sub, icon } from './kit'
 const WALK_CHOICES = [15, 30, 45, 60] as const
 
 export default function DayView({ tripId, day, geo }: { tripId: string; day: Day; geo: DayGeo }) {
-  const near = day.zone ?? day.stops[0]
+  const zone = day.zones[0]
+  const near = zone ?? day.stops[0]
   const outside = day.stops.filter((s) => geo.inZone(s) === false).length
   const totalWalk = geo.legs.reduce((n, l) => n + (l?.minutes ?? 0), 0)
 
@@ -27,11 +28,11 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
 
       <section className="space-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]">Today's zone</h2>
-        {day.zone ? (
+        {zone ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[15px] font-medium">{day.zone.name}</span>
-              <Btn kind="ghost" onClick={() => actions.patchDay(tripId, day.id, { zone: undefined })}>
+              <span className="text-[15px] font-medium">{zone.name}</span>
+              <Btn kind="ghost" onClick={() => actions.removeZone(tripId, day.id, zone.id)}>
                 Clear
               </Btn>
             </div>
@@ -40,8 +41,8 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
                 <Btn
                   key={m}
                   className="flex-1 whitespace-nowrap px-2"
-                  kind={day.zone!.walkMinutes === m ? 'primary' : 'plain'}
-                  onClick={() => actions.patchDay(tripId, day.id, { zone: { ...day.zone!, walkMinutes: m } })}
+                  kind={zone.walkMinutes === m ? 'primary' : 'plain'}
+                  onClick={() => actions.patchZone(tripId, day.id, zone.id, { walkMinutes: m })}
                 >
                   {m} min
                 </Btn>
@@ -56,12 +57,12 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
           <Search
             near={near}
             placeholder="Pick a town or area to explore on foot"
-            onPick={(p) => actions.patchDay(tripId, day.id, { zone: { name: p.name, lat: p.lat, lon: p.lon, walkMinutes: 30 } })}
+            onPick={(p) => actions.addZone(tripId, day.id, { name: p.name, lat: p.lat, lon: p.lon, walkMinutes: 30 })}
           />
         )}
       </section>
 
-      <Assistant key={day.zone ? `${day.zone.lat},${day.zone.lon},${day.zone.walkMinutes}` : 'none'} tripId={tripId} day={day} />
+      <Assistant key={zone ? `${zone.lat},${zone.lon},${zone.walkMinutes}` : 'none'} tripId={tripId} day={day} />
 
       <section className="space-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]">

@@ -15,7 +15,7 @@ export default function App() {
   const geo = useDayGeo(day)
 
   const route = useMemo(() => geo.legs.flatMap((l) => (l ? [l.shape] : [])), [geo.legs])
-  const center = day?.zone
+  const center = day?.zones[0]
 
   return (
     <div className="relative h-full w-full overflow-hidden">
