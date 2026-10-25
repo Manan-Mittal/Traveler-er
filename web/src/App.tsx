@@ -6,6 +6,7 @@ import TripList from './ui/TripList'
 import DayView from './ui/DayView'
 import Bookings from './ui/Bookings'
 import Cities from './ui/Cities'
+import Inbox from './ui/Inbox'
 import type { MapLink } from './MapView'
 import { zoneColor } from './zones'
 import { Btn, Sub, Title } from './ui/kit'
@@ -70,6 +71,7 @@ export default function App() {
                   ))}
                 </div>
                 {day && <DayView key={day.id} trip={trip} day={day} geo={geo} />}
+                <Inbox trip={trip} day={day} />
               </>
             ) : (
               <Bookings trip={trip} />
