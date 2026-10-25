@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { actions } from '../store'
 import type { Trip } from '../types'
 import { Btn, Input, Row, Sub, Title } from './kit'
@@ -8,6 +8,8 @@ export default function TripList({ trips }: { trips: Trip[] }) {
   const [name, setName] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
+  const file = useRef<HTMLInputElement>(null)
+  const [msg, setMsg] = useState('')
   const valid = name.trim() && start && end && end >= start
 
   return (
@@ -44,10 +46,41 @@ export default function TripList({ trips }: { trips: Trip[] }) {
           </div>
         </div>
       ) : (
-        <Btn kind="primary" onClick={() => setAdding(true)}>
-          New trip
-        </Btn>
+        <div className="flex flex-wrap gap-2">
+          <Btn kind="primary" onClick={() => setAdding(true)}>
+            New trip
+          </Btn>
+          <Btn
+            onClick={() => {
+              const a = document.createElement('a')
+              a.href = URL.createObjectURL(new Blob([actions.exportAll()], { type: 'application/json' }))
+              a.download = 'traveler-er-trips.json'
+              a.click()
+            }}
+          >
+            Export
+          </Btn>
+          <Btn onClick={() => file.current?.click()}>Import</Btn>
+          <input
+            ref={file}
+            type="file"
+            accept="application/json"
+            hidden
+            onChange={async (e) => {
+              const f = e.target.files?.[0]
+              if (!f) return
+              try {
+                actions.importAll(await f.text())
+                setMsg('Imported.')
+              } catch (err) {
+                setMsg((err as Error).message)
+              }
+              e.target.value = ''
+            }}
+          />
+        </div>
       )}
+      {msg && <Sub>{msg}</Sub>}
     </div>
   )
 }

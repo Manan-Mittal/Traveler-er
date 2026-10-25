@@ -58,6 +58,15 @@ const updateTrip = (id: string, fn: (t: Trip) => Trip) =>
   set({ ...state, trips: state.trips.map((t) => (t.id === id ? { ...fn(t), updatedAt: Date.now() } : t)) })
 
 export const actions = {
+  exportAll(): string {
+    return JSON.stringify({ app: 'traveler-er', version: 1, trips: state.trips }, null, 2)
+  },
+  importAll(text: string) {
+    const data = JSON.parse(text) as { app?: string; trips?: Trip[] }
+    if (data.app !== 'traveler-er' || !Array.isArray(data.trips)) throw new Error('Not a Traveler-er export file')
+    const have = new Set(state.trips.map((t) => t.id))
+    set({ ...state, trips: [...data.trips.filter((t) => !have.has(t.id)), ...state.trips] })
+  },
   createTrip(name: string, startDate: string, endDate: string) {
     const days: Day[] = dayList(startDate, endDate).map((date, i) => ({
       id: uid(),
