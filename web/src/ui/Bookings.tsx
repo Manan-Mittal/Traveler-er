@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { actions } from '../store'
 import type { BookingKind, Trip } from '../types'
 import { Btn, Input, Row, Sub } from './kit'
+import { DatePicker } from './DatePicker'
 
 const KINDS: BookingKind[] = ['flight', 'train', 'lodging', 'ticket', 'restaurant', 'other']
 const emoji: Record<BookingKind, string> = { flight: '✈️', train: '🚆', lodging: '🛏️', ticket: '🎟️', restaurant: '🍽️', other: '📌' }
@@ -48,7 +49,7 @@ export default function Bookings({ trip }: { trip: Trip }) {
               <option key={k}>{k}</option>
             ))}
           </select>
-          <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+          <DatePicker value={deadline} onChange={setDeadline} placeholder="Book by (optional)" />
         </div>
         <Input placeholder="Link (optional)" value={url} onChange={(e) => setUrl(e.target.value)} />
         <Btn
