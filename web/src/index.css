@@ -69,3 +69,17 @@ body { background: var(--bg); color: var(--text); overscroll-behavior: none; }
 .date-pop .rdp-chevron { fill: var(--accent); }
 .date-pop .rdp-today:not(.rdp-selected) .rdp-day_button { color: var(--accent); font-weight: 700; }
 @media (max-width: 480px) { .date-pop { left: 50%; transform: translateX(-50%); } }
+
+@keyframes search-sweep {
+  0%, 100% { transform: translate(0, 0) rotate(-8deg); }
+  50% { transform: translate(64px, -2px) rotate(8deg); }
+}
+@keyframes search-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(1.7); opacity: 1; }
+}
+.searching-glass { animation: search-sweep 2.4s ease-in-out infinite; }
+.searching-dot { animation: search-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .searching-glass, .searching-dot { animation: none; }
+}

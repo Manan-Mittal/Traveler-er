@@ -1,18 +1,16 @@
 import { useState } from 'react'
 import { actions } from '../store'
-import type { Day } from '../types'
+import type { Day, Zone } from '../types'
 import { assistantEnabled, draftDay, type DraftStop } from '../services/assistant'
 import { Btn, Input, Row, Sub, icon } from './kit'
+import Searching from './Searching'
 
-export default function Assistant({ tripId, day }: { tripId: string; day: Day }) {
+export default function Assistant({ tripId, day, zone }: { tripId: string; day: Day; zone: Zone }) {
   const [interests, setInterests] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [draft, setDraft] = useState<DraftStop[] | null>(null)
   const [keep, setKeep] = useState<Set<number>>(new Set())
-
-  const zone = day.zones[0]
-  if (!zone) return null
 
   const ask = async () => {
     setBusy(true)
@@ -31,7 +29,7 @@ export default function Assistant({ tripId, day }: { tripId: string; day: Day })
 
   const apply = () => {
     draft?.forEach((s, i) => {
-      if (keep.has(i)) actions.addStop(tripId, day.id, { name: s.name, lat: s.lat, lon: s.lon, category: s.category, notes: '', source: 'assistant', why: s.why })
+      if (keep.has(i)) actions.addStop(tripId, day.id, { name: s.name, lat: s.lat, lon: s.lon, category: s.category, notes: '', source: 'assistant', why: s.why, zoneId: zone.id })
     })
     setDraft(null)
   }
@@ -74,9 +72,13 @@ export default function Assistant({ tripId, day }: { tripId: string; day: Day })
       ) : (
         <div className="space-y-2">
           <Input aria-label="What are you into?" placeholder="What are you into? e.g. old temples, tea, quiet cafes" value={interests} onChange={(e) => setInterests(e.target.value)} />
-          <Btn kind="primary" disabled={busy} onClick={ask}>
-            {busy ? 'Looking…' : `Suggest places near ${zone.name}`}
-          </Btn>
+          {busy ? (
+            <Searching />
+          ) : (
+            <Btn kind="primary" onClick={ask}>
+              {`Suggest places near ${zone.name}`}
+            </Btn>
+          )}
         </div>
       )}
       {error && <p className="text-[12px] text-[var(--danger)]">{error}</p>}
