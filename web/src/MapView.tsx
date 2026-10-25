@@ -154,7 +154,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       const node = document.createElement('div')
       const outside = inZone(s) === false
       node.textContent = String(i + 1)
-      node.style.cssText = `width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 13px -apple-system,system-ui;color:#fff;background:${colorOf(s)};border:2px solid ${outside ? '#ff9f0a' : '#fff'};box-shadow:0 2px 8px rgba(0,0,0,.35)`
+      node.style.cssText = `z-index:2;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 13px -apple-system,system-ui;color:#fff;background:${colorOf(s)};border:2px solid ${outside ? '#ff9f0a' : '#fff'};box-shadow:0 2px 8px rgba(0,0,0,.35)`
       return new maplibregl.Marker({ element: node }).setLngLat([s.lon, s.lat]).addTo(m)
     })
   }, [stops, zones, inZone, colorOf])
@@ -167,8 +167,13 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     labels.current = zones.map((g) => {
       const node = document.createElement('div')
       node.textContent = g.zone.name
-      node.style.cssText = `pointer-events:none;padding:3px 10px;border-radius:999px;font:600 12px -apple-system,system-ui;color:#fff;background:${g.color};box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis`
-      return new maplibregl.Marker({ element: node }).setLngLat([g.zone.lon, g.zone.lat]).addTo(m)
+      node.style.cssText = `pointer-events:none;z-index:1;padding:3px 10px;border-radius:999px;font:600 12px -apple-system,system-ui;color:#fff;background:${g.color};box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis`
+      // Stops often sit right at the zone center, so the tag hangs off the top of the walk area (or above the center until it loads).
+      const ring = g.polygon?.geometry.coordinates[0]
+      const top = ring?.reduce((a, b) => (b[1] > a[1] ? b : a))
+      return new maplibregl.Marker({ element: node, anchor: 'bottom', offset: top ? [0, -4] : [0, -20] })
+        .setLngLat(top ? [g.zone.lon, top[1]] : [g.zone.lon, g.zone.lat])
+        .addTo(m)
     })
   }, [zones])
 

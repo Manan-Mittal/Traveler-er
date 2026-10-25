@@ -48,6 +48,8 @@ export async function resolvePlaces(
   raw: RawPlace[],
   onProgress: (done: number, total: number) => void,
   signal?: AbortSignal,
+  /** Checked before each lookup; once true, the rest are skipped and the import finishes with what it has. */
+  stopped: () => boolean = () => false,
 ): Promise<{ found: ResolvedPlace[]; missing: RawPlace[]; lookupFailed: boolean }> {
   const found: ResolvedPlace[] = []
   const missing: RawPlace[] = []
@@ -70,9 +72,11 @@ export async function resolvePlaces(
   for (const p of raw.filter((p) => p.lat != null && p.lon != null)) {
     const at = { lat: p.lat!, lon: p.lon! }
     // Nearby places almost always share a city; reuse it rather than asking again.
-    const near = found.find((f) => distanceKm(f, at) < 1.5)
+    const near = found.find((f) => f.countryCode && distanceKm(f, at) < 3)
     if (near) {
       found.push({ ...p, ...at, city: near.city, country: near.country, countryCode: near.countryCode, category: 'other' })
+    } else if (stopped()) {
+      found.push({ ...p, ...at, city: 'Elsewhere', country: 'Unknown country', countryCode: '', category: 'other' })
     } else {
       const f = (await photon(`reverse?lat=${at.lat}&lon=${at.lon}`, signal).catch(failed))[0]
       const same = f?.properties.name?.toLowerCase() === p.name.toLowerCase()
@@ -106,6 +110,11 @@ export async function resolvePlaces(
   }
 
   for (const p of raw.filter((p) => p.lat == null || p.lon == null)) {
+    if (stopped()) {
+      missing.push(p)
+      tick()
+      continue
+    }
     const area = await areaOf(p.listName)
     const features = await lookup(p.address ? `${p.name}, ${p.address}` : p.name, area?.bias, signal).catch(failed)
     // Only trust matches near the rest of the list: "Din Tai Fung" exists on three continents.
