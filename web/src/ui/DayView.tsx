@@ -19,7 +19,8 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
         <input
           value={day.title}
           onChange={(e) => actions.patchDay(tripId, day.id, { title: e.target.value })}
-          className="w-full bg-transparent text-[22px] font-bold tracking-tight outline-none"
+          aria-label="Day title"
+          className="w-full rounded-lg bg-transparent text-[22px] font-bold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
         />
         <Sub>{day.date}</Sub>
       </div>
@@ -38,6 +39,7 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
               {WALK_CHOICES.map((m) => (
                 <Btn
                   key={m}
+                  className="flex-1 whitespace-nowrap px-2"
                   kind={day.zone!.walkMinutes === m ? 'primary' : 'plain'}
                   onClick={() => actions.patchDay(tripId, day.id, { zone: { ...day.zone!, walkMinutes: m } })}
                 >
@@ -89,9 +91,9 @@ export default function DayView({ tripId, day, geo }: { tripId: string; day: Day
                   </div>
                   {s.why && <Sub>{s.why}</Sub>}
                 </div>
-                <button className="px-1 text-[var(--text-2)] disabled:opacity-20" disabled={i === 0} onClick={() => actions.moveStop(tripId, day.id, i, i - 1)}>↑</button>
-                <button className="px-1 text-[var(--text-2)] disabled:opacity-20" disabled={i === day.stops.length - 1} onClick={() => actions.moveStop(tripId, day.id, i, i + 1)}>↓</button>
-                <button className="px-1 text-[var(--text-2)]" onClick={() => actions.removeStop(tripId, day.id, s.id)}>✕</button>
+                <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${s.name} up`} disabled={i === 0} onClick={() => actions.moveStop(tripId, day.id, i, i - 1)}>↑</button>
+                <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${s.name} down`} disabled={i === day.stops.length - 1} onClick={() => actions.moveStop(tripId, day.id, i, i + 1)}>↓</button>
+                <button className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-2)]" aria-label={`Remove ${s.name}`} onClick={() => actions.removeStop(tripId, day.id, s.id)}>✕</button>
               </Row>
             </div>
           ))}

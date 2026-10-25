@@ -26,7 +26,7 @@ export default function Search({ near, placeholder, onPick }: { near?: { lat: nu
 
   return (
     <div className="relative">
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} />
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} aria-label={placeholder} />
       {error && <p className="mt-1 text-[12px] text-[var(--danger)]">{error}</p>}
       {results.length > 0 && (
         <div className="mt-2 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface-solid)]">

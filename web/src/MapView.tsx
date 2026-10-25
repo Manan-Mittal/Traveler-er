@@ -15,6 +15,12 @@ interface Props {
 
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
+// Keep in sync with the <aside> classes in App.tsx: a left sidebar on wide or landscape screens, a bottom sheet from 45% down otherwise.
+const panelPadding = (w: number, h: number) =>
+  w >= 768 || w > h
+    ? { top: 0, bottom: 0, left: Math.min(400, w * 0.5) + 12, right: 0 }
+    : { top: 0, bottom: Math.round(h * 0.55), left: 0, right: 0 }
+
 export default function MapView({ stops, zone, route, center, inZone }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -45,7 +51,7 @@ export default function MapView({ stops, zone, route, center, inZone }: Props) {
       zoom: 11,
       attributionControl: { compact: true },
     })
-    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     m.on('load', () => {
       m.addSource('zone', { type: 'geojson', data: empty })
       m.addSource('route', { type: 'geojson', data: empty })
@@ -82,10 +88,12 @@ export default function MapView({ stops, zone, route, center, inZone }: Props) {
     if (!m) return
     const pts: [number, number][] = stops.map((s) => [s.lon, s.lat])
     if (zone) zone.geometry.coordinates[0].forEach((c) => pts.push([c[0], c[1]]))
+    // The map keeps this padding, so later camera moves center on the visible part rather than under the panel.
+    m.setPadding(panelPadding(m.getContainer().clientWidth, m.getContainer().clientHeight))
     if (pts.length > 1) {
       const b = new maplibregl.LngLatBounds(pts[0], pts[0])
       pts.forEach((p) => b.extend(p))
-      m.fitBounds(b, { padding: { top: 80, bottom: 80, left: 440, right: 80 }, maxZoom: 16, duration: 700 })
+      m.fitBounds(b, { padding: 40, maxZoom: 16, duration: 700 })
     } else if (pts.length === 1) {
       m.flyTo({ center: pts[0], zoom: 14, duration: 700 })
     } else if (center) {

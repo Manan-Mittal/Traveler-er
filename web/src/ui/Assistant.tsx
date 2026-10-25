@@ -72,7 +72,7 @@ export default function Assistant({ tripId, day }: { tripId: string; day: Day })
         </div>
       ) : (
         <div className="space-y-2">
-          <Input placeholder="What are you into? e.g. old temples, tea, quiet cafes" value={interests} onChange={(e) => setInterests(e.target.value)} />
+          <Input aria-label="What are you into?" placeholder="What are you into? e.g. old temples, tea, quiet cafes" value={interests} onChange={(e) => setInterests(e.target.value)} />
           <Btn kind="primary" disabled={busy} onClick={ask}>
             {busy ? 'Looking…' : `Suggest places near ${day.zone.name}`}
           </Btn>
