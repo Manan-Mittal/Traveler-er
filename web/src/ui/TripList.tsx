@@ -3,6 +3,10 @@ import { actions } from '../store'
 import type { Trip } from '../types'
 import { Btn, Input, Row, Sub, Title } from './kit'
 import { DateRangePicker } from './DatePicker'
+import { differenceInCalendarDays, parseISO } from 'date-fns'
+
+const MAX_DAYS = 366
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export default function TripList({ trips }: { trips: Trip[] }) {
   const [adding, setAdding] = useState(false)
@@ -11,7 +15,10 @@ export default function TripList({ trips }: { trips: Trip[] }) {
   const [end, setEnd] = useState('')
   const file = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
-  const valid = name.trim() && start && end && end >= start
+  const length = start && end ? differenceInCalendarDays(parseISO(end), parseISO(start)) + 1 : 0
+  const tooLong = length > MAX_DAYS
+  const valid = name.trim() && start && end && end >= start && !tooLong
+  const reset = () => (setAdding(false), setName(''), setStart(''), setEnd(''))
 
   return (
     <div className="space-y-5">
@@ -23,7 +30,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
             <div className="min-w-0 flex-1">
               <div className="truncate text-[16px] font-semibold">{t.name}</div>
               <Sub>
-                {t.startDate} to {t.endDate} · {t.days.length} days
+                {t.startDate} to {t.endDate} · {plural(t.days.length, 'day')}
               </Sub>
             </div>
             <span className="text-[var(--text-2)]">›</span>
@@ -34,11 +41,12 @@ export default function TripList({ trips }: { trips: Trip[] }) {
         <div className="space-y-2">
           <Input autoFocus placeholder="Trip name, e.g. Taiwan" value={name} onChange={(e) => setName(e.target.value)} />
           <DateRangePicker start={start} end={end} onChange={(a, b) => (setStart(a), setEnd(b))} />
+          {tooLong && <p className="text-[12px] text-[var(--danger)]">Trips can be at most {MAX_DAYS} days. Pick a shorter range.</p>}
           <div className="flex gap-2">
-            <Btn kind="primary" disabled={!valid} onClick={() => (actions.createTrip(name.trim(), start, end), setAdding(false))}>
+            <Btn kind="primary" disabled={!valid} onClick={() => (actions.createTrip(name.trim(), start, end), reset())}>
               Create trip
             </Btn>
-            <Btn kind="ghost" onClick={() => setAdding(false)}>
+            <Btn kind="ghost" onClick={reset}>
               Cancel
             </Btn>
           </div>
@@ -68,8 +76,8 @@ export default function TripList({ trips }: { trips: Trip[] }) {
               const f = e.target.files?.[0]
               if (!f) return
               try {
-                actions.importAll(await f.text())
-                setMsg('Imported.')
+                const { added, skipped } = actions.importAll(await f.text())
+                setMsg(added === 0 ? 'Nothing new to import: those trips are already here.' : `Imported ${plural(added, 'trip')}${skipped ? `, ${skipped} already here` : ''}.`)
               } catch (err) {
                 setMsg((err as Error).message)
               }
