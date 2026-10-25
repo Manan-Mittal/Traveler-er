@@ -6,7 +6,7 @@ compatibility_date = "2025-06-01"
 # Comma-separated list of sites allowed to call this API.
 ALLOWED_ORIGINS = "https://manan-mittal.github.io,http://localhost:5173,http://localhost:4173"
 # Google OAuth client id for "Sign in with Google". Public, not a secret.
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "862290647282-deke61u74jr7aruqlp1h5l5gpjpgbnro.apps.googleusercontent.com"
 
 # Saved trips and sign-in sessions. Tables are created by the worker on first use.
 [[d1_databases]]
