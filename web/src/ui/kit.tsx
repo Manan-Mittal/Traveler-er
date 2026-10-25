@@ -34,3 +34,21 @@ export const Input = (p: React.InputHTMLAttributes<HTMLInputElement>) => (
 export const icon: Record<string, string> = {
   sight: '🏛️', food: '🍜', cafe: '☕', nature: '🌿', shop: '🛍️', stay: '🛏️', transit: '🚉', other: '📍',
 }
+
+/** iOS-style segmented control. */
+export function Segmented<T extends string | number>({ options, value, onChange, label }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; label: string }) {
+  return (
+    <div role="group" aria-label={label} className="flex rounded-full bg-[var(--accent-soft)] p-0.5">
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          aria-pressed={o.value === value}
+          onClick={() => onChange(o.value)}
+          className={`flex-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium transition pointer-coarse:py-2.5 ${o.value === value ? 'bg-[var(--surface-solid)] text-[var(--text)] shadow-sm' : 'text-[var(--text-2)]'}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}

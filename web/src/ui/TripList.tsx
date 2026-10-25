@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { actions } from '../store'
 import type { Trip } from '../types'
 import { Btn, Input, Row, Sub, Title } from './kit'
+import { formatRange } from '../format'
 import { DateRangePicker } from './DatePicker'
 import ImportList from './ImportList'
 import Account from './Account'
@@ -36,7 +37,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
             <div className="min-w-0 flex-1">
               <div className="truncate text-[16px] font-semibold">{t.name}</div>
               <Sub>
-                {t.startDate} to {t.endDate} · {plural(t.days.length, 'day')}
+                {formatRange(t.startDate, t.endDate)} · {plural(t.days.length, 'day')}
               </Sub>
             </div>
             <span className="text-[var(--text-2)]">›</span>
@@ -61,23 +62,31 @@ export default function TripList({ trips }: { trips: Trip[] }) {
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <Btn kind="primary" onClick={() => setAdding(true)}>
+        <div className="space-y-3">
+          <Btn kind="primary" className="w-full" onClick={() => setAdding(true)}>
             New trip
           </Btn>
-          <Btn
-            onClick={() => {
-              const a = document.createElement('a')
-              a.href = URL.createObjectURL(new Blob([actions.exportAll()], { type: 'application/json' }))
-              a.download = 'traveler-er-trips.json'
-              a.click()
-            }}
-          >
-            Export
-          </Btn>
-          <Btn onClick={() => actions.addSampleTrip()}>Try the Taiwan sample</Btn>
-          <Btn onClick={() => setImporting(true)}>Import Google Maps lists</Btn>
-          <Btn onClick={() => file.current?.click()}>Import</Btn>
+          <div className="overflow-hidden rounded-2xl bg-[var(--accent-soft)]">
+            {[
+              ['Try the Taiwan sample', () => actions.addSampleTrip()],
+              ['Import Google Maps lists', () => setImporting(true)],
+              ['Import a trips file', () => file.current?.click()],
+              [
+                'Export all trips',
+                () => {
+                  const a = document.createElement('a')
+                  a.href = URL.createObjectURL(new Blob([actions.exportAll()], { type: 'application/json' }))
+                  a.download = 'traveler-er-trips.json'
+                  a.click()
+                },
+              ],
+            ].map(([label, run]) => (
+              <button key={label as string} onClick={run as () => void} className="flex min-h-11 w-full items-center justify-between border-b border-[var(--line)] px-4 py-2.5 text-left text-[15px] text-[var(--accent)] last:border-0">
+                {label as string}
+                <span className="text-[var(--text-2)]">›</span>
+              </button>
+            ))}
+          </div>
           <input
             ref={file}
             type="file"

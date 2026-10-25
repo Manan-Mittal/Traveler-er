@@ -10,7 +10,9 @@ import Inbox from './ui/Inbox'
 import Planner from './ui/Planner'
 import type { MapLink } from './MapView'
 import { zoneColor } from './zones'
-import { Btn, Sub, Title } from './ui/kit'
+import { Btn, Sub, Title, Segmented } from './ui/kit'
+import { formatDay, formatRange } from './format'
+import { setTheme, useTheme } from './theme'
 
 // Where the bottom sheet's top edge sits on a phone held upright, as a fraction of the screen height.
 const SHEET_STOPS = [0.78, 0.45, 0.1]
@@ -21,6 +23,7 @@ export default function App() {
   const trip = trips.find((t) => t.id === tripId)
   const day = trip?.days.find((d) => d.id === dayId)
   const geo = useDayGeo(day)
+  const { theme, dark } = useTheme()
   const [sheet, setSheet] = useState(1)
   const drag = useRef<number | null>(null)
   const nudge = (dir: number) => setSheet((i) => Math.max(0, Math.min(SHEET_STOPS.length - 1, i + dir)))
@@ -38,14 +41,22 @@ export default function App() {
   const center = day?.zones[0] ?? city
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <MapView sheetTop={SHEET_STOPS[Math.min(sheet, 1)]} stops={geo.stops} zones={geo.zones} route={route} links={links} center={center} inZone={geo.inZone} colorOf={geo.colorOf} />
+      <MapView key={dark ? 'dark' : 'light'} sheetTop={SHEET_STOPS[Math.min(sheet, 1)]} stops={geo.stops} zones={geo.zones} route={route} links={links} center={center} inZone={geo.inZone} colorOf={geo.colorOf} />
+      <button
+        onClick={() => setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system')}
+        aria-label={`Appearance: ${theme === 'system' ? 'automatic' : theme}. Tap to change.`}
+        title={`Appearance: ${theme === 'system' ? 'automatic' : theme}`}
+        className="glass absolute right-[calc(3.75rem+env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-10 grid h-9 w-9 place-items-center rounded-full! text-[18px]"
+      >
+        <span aria-hidden>{theme === 'system' ? '◐' : dark ? '🌙' : '☀️'}</span>
+      </button>
       <aside
         style={{ top: `${SHEET_STOPS[sheet] * 100}%` }}
         className="glass absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto overflow-x-hidden overscroll-contain p-5 pt-0 transition-[top] duration-300 landscape:top-3! md:top-4! md:pt-5 landscape:pt-5 landscape:inset-x-auto landscape:bottom-[max(0.75rem,env(safe-area-inset-bottom))] landscape:left-[max(0.75rem,env(safe-area-inset-left))] landscape:w-[min(400px,50%)] md:inset-x-auto md:bottom-4 md:left-4 md:w-[400px]"
       >
         <button
           aria-label={sheet === 2 ? 'Collapse the panel' : 'Expand the panel'}
-          className="sticky top-0 z-10 -mx-5 mb-2 block w-[calc(100%+2.5rem)] touch-none rounded-t-2xl bg-[var(--surface-solid)] pb-2 pt-3 md:hidden landscape:hidden"
+          className="sticky top-0 z-10 -mx-5 mb-2 block w-[calc(100%+2.5rem)] touch-none rounded-t-2xl bg-[var(--surface)] pb-2 pt-3 backdrop-blur md:hidden landscape:hidden"
           onPointerDown={(e) => ((drag.current = e.clientY), e.currentTarget.setPointerCapture(e.pointerId))}
           onPointerUp={(e) => {
             const dy = e.clientY - (drag.current ?? e.clientY)
@@ -70,15 +81,18 @@ export default function App() {
             </div>
             <div>
               <Title>{trip.name}</Title>
-              <Sub>
-                {trip.startDate} to {trip.endDate}
-              </Sub>
+              <Sub>{formatRange(trip.startDate, trip.endDate)}</Sub>
             </div>
-            <div className="flex gap-2">
-              <Btn kind={tab === 'days' ? 'primary' : 'plain'} onClick={() => setTab('days')}>Days</Btn>
-              <Btn kind={tab === 'plan' ? 'primary' : 'plain'} onClick={() => setTab('plan')}>✨ Plan</Btn>
-              <Btn kind={tab === 'book' ? 'primary' : 'plain'} onClick={() => setTab('book')}>Bookings</Btn>
-            </div>
+            <Segmented
+              label="Trip sections"
+              value={tab}
+              onChange={setTab}
+              options={[
+                { value: 'days', label: 'Days' },
+                { value: 'plan', label: '✨ Plan' },
+                { value: 'book', label: 'Bookings' },
+              ]}
+            />
             {/* Kept mounted while hidden so a review in progress survives switching tabs. */}
             <div hidden={tab !== 'plan'}>
               <Planner key={trip.id} trip={trip} />
@@ -92,11 +106,11 @@ export default function App() {
                       key={d.id}
                       onClick={() => actions.openDay(d.id)}
                       aria-pressed={d.id === dayId}
-                      aria-label={`Day ${i + 1}, ${d.date}`}
-                      className={`shrink-0 rounded-xl px-3 py-1.5 pointer-coarse:py-2.5 text-[13px] font-medium ${d.id === dayId ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--accent-soft)]'}`}
+                      aria-label={`Day ${i + 1}, ${formatDay(d.date, true)}`}
+                      className={`shrink-0 rounded-xl px-3 py-1.5 text-left text-[13px] font-medium ${d.id === dayId ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--accent-soft)]'}`}
                     >
-                      {i + 1}
-                      <span className="ml-1 opacity-60">{d.date.slice(5)}</span>
+                      <span className="block text-[11px] font-semibold uppercase leading-tight opacity-60">Day {i + 1}</span>
+                      {formatDay(d.date)}
                     </button>
                   ))}
                 </div>
