@@ -1,5 +1,6 @@
 import { draftDay, type PlanRequest } from './plan.ts'
 import { freeModels, type Env } from './openrouter.ts'
+import { fetchSharedList } from './gmaps.ts'
 
 const hits = new Map<string, number[]>()
 
@@ -46,6 +47,10 @@ export default {
           stopCount: Math.min(Math.max(Number(b.stopCount) || 5, 2), 8),
         })
         return json({ stops })
+      }
+      if (url.pathname === '/api/gmaps-list' && req.method === 'GET') {
+        if (limited(req.headers.get('CF-Connecting-IP') ?? 'local')) return json({ error: 'slow down, try again in a minute' }, 429)
+        return json(await fetchSharedList(url.searchParams.get('url') ?? ''))
       }
       return json({ error: 'not found' }, 404)
     } catch (e) {
