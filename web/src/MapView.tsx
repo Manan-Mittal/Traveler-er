@@ -40,6 +40,8 @@ const HOP_LEGS = HOP_CITIES.slice(1).map((c, i) => hopArc(HOP_CITIES[i], c))
 const point = (c: [number, number]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })
 const line = (coordinates: [number, number][]): GeoJSON.Feature => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } })
 
+const PLANE_SVG = `<svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 21 21l-9-3.6L3 21z" fill="#fff" stroke="#0a84ff" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 1.5v15.9" stroke="#0a84ff" stroke-width="1.4" stroke-linecap="round"/></svg>`
+
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
 // Keep in sync with the <aside> classes in App.tsx: a left sidebar on wide or landscape screens, a bottom sheet from 45% down otherwise.
@@ -54,6 +56,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   const markers = useRef<maplibregl.Marker[]>([])
   const labels = useRef<maplibregl.Marker[]>([])
   const ready = useRef(false)
+  const plane = useRef<maplibregl.Marker | null>(null)
   const [tilesDown, setTilesDown] = useState(false)
   const latest = useRef({ zones, route, links })
   latest.current = { zones, route, links }
@@ -114,12 +117,11 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       m.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 4 } })
       m.addSource('hop-line', { type: 'geojson', data: empty })
       m.addSource('hop-city', { type: 'geojson', data: empty })
-      m.addSource('hop-dot', { type: 'geojson', data: empty })
+      m.addSource('hop-ping', { type: 'geojson', data: empty })
       const hidden = { visibility: 'none' } as const
       m.addLayer({ id: 'hop-line', type: 'line', source: 'hop-line', layout: { ...hidden, 'line-cap': 'round' }, paint: { 'line-color': '#0a84ff', 'line-width': 2.5, 'line-dasharray': [0.5, 2.5] } })
+      m.addLayer({ id: 'hop-ping', type: 'circle', source: 'hop-ping', layout: hidden, paint: { 'circle-radius': 6, 'circle-color': '#0a84ff', 'circle-opacity': 0, 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2, 'circle-stroke-opacity': 0 } })
       m.addLayer({ id: 'hop-city', type: 'circle', source: 'hop-city', layout: hidden, paint: { 'circle-radius': 4, 'circle-color': '#fff', 'circle-stroke-color': '#0a84ff', 'circle-stroke-width': 2 } })
-      m.addLayer({ id: 'hop-halo', type: 'circle', source: 'hop-dot', layout: hidden, paint: { 'circle-radius': 14, 'circle-color': '#0a84ff', 'circle-opacity': 0.2, 'circle-blur': 0.8 } })
-      m.addLayer({ id: 'hop-dot', type: 'circle', source: 'hop-dot', layout: hidden, paint: { 'circle-radius': 6, 'circle-color': '#0a84ff', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } })
       ready.current = true
       paint()
       m.fire('hop-ready')
@@ -137,11 +139,15 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   useEffect(() => {
     const m = map.current
     if (!m) return
-    const layers = ['hop-line', 'hop-city', 'hop-halo', 'hop-dot']
+    const layers = ['hop-line', 'hop-ping', 'hop-city']
     const show = (v: 'visible' | 'none') => layers.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, 'visibility', v))
     let raf = 0
+    plane.current?.remove()
+    plane.current = null
     const run = () => {
       cancelAnimationFrame(raf)
+      plane.current?.remove()
+      plane.current = null
       if (!idle) return show('none')
       show('visible')
       const src = (id: string) => m.getSource(id) as maplibregl.GeoJSONSource
@@ -153,6 +159,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       }
       const cycle = HOP_LEGS.length * (HOP_MS + PAUSE_MS) + 700
       const t0 = performance.now()
+      let heading = 90
       const tick = (now: number) => {
         const t = Math.max(0, now - t0) % cycle
         const leg = Math.min(HOP_LEGS.length - 1, Math.floor(t / (HOP_MS + PAUSE_MS)))
@@ -165,10 +172,32 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
         const here = arc[upto]
         const done = HOP_LEGS.slice(0, leg).flat()
         src('hop-line').setData({ type: 'FeatureCollection', features: [line([...done, ...arc.slice(0, upto + 1)])] })
-        src('hop-dot').setData({ type: 'FeatureCollection', features: [point(here)] })
-        // The dot squashes as it lands and the halo breathes while it waits.
-        m.setPaintProperty('hop-dot', 'circle-radius', hopping ? 6 : 6 + 2 * Math.sin(((within - HOP_MS) / PAUSE_MS) * Math.PI))
-        m.setPaintProperty('hop-halo', 'circle-radius', hopping ? 14 : 14 + 10 * Math.sin(((within - HOP_MS) / PAUSE_MS) * Math.PI))
+        if (!plane.current) {
+          const el = document.createElement('div')
+          el.style.pointerEvents = 'none'
+          const inner = document.createElement('div')
+          inner.innerHTML = PLANE_SVG
+          el.appendChild(inner)
+          plane.current = new maplibregl.Marker({ element: el, rotationAlignment: 'viewport' }).setLngLat(here).addTo(m)
+        }
+        // Lift off, cruise bigger with the shadow falling away, then settle back down on landing.
+        const lift = hopping ? Math.sin(Math.PI * k) : 0
+        const inner = plane.current.getElement().firstElementChild as HTMLElement
+        inner.style.transform = `scale(${1 + 0.45 * lift})`
+        inner.style.filter = `drop-shadow(0 ${3 + 12 * lift}px ${4 + 7 * lift}px rgba(10,40,90,${0.35 - 0.12 * lift}))`
+        // A ring ripples out from the city the plane has just reached.
+        const landed = hopping ? 0 : Math.min(1, (within - HOP_MS) / PAUSE_MS)
+        const dest = HOP_CITIES[leg + 1]
+        src('hop-ping').setData({ type: 'FeatureCollection', features: hopping ? [] : [point(dest)] })
+        m.setPaintProperty('hop-ping', 'circle-radius', 5 + 22 * landed)
+        m.setPaintProperty('hop-ping', 'circle-stroke-opacity', 0.7 * (1 - landed))
+        // Point the plane along its path, and let it bob a little while it waits at a city.
+        const ahead = arc[Math.min(arc.length - 1, upto + 1)]
+        const behind = arc[Math.max(0, upto - 1)]
+        const a = m.project(behind)
+        const b = m.project(ahead)
+        if (a.x !== b.x || a.y !== b.y) heading = (Math.atan2(b.x - a.x, -(b.y - a.y)) * 180) / Math.PI
+        plane.current.setLngLat(here).setRotation(heading)
         raf = requestAnimationFrame(tick)
       }
       raf = requestAnimationFrame(tick)
@@ -177,6 +206,8 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     if (ready.current) run()
     return () => {
       cancelAnimationFrame(raf)
+      plane.current?.remove()
+      plane.current = null
       m.off('hop-ready', run)
     }
   }, [idle])
