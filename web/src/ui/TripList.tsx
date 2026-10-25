@@ -6,6 +6,7 @@ import { formatRange } from '../format'
 import { DateRangePicker } from './DatePicker'
 import ImportList from './ImportList'
 import Account from './Account'
+import { useSession } from '../auth'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 
 const MAX_DAYS = 366
@@ -19,6 +20,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
   const file = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
   const [importing, setImporting] = useState(false)
+  const session = useSession()
   const length = start && end ? differenceInCalendarDays(parseISO(end), parseISO(start)) + 1 : 0
   const tooLong = length > MAX_DAYS
   const valid = name.trim() && start && end && end >= start && !tooLong
@@ -68,7 +70,7 @@ export default function TripList({ trips }: { trips: Trip[] }) {
           </Btn>
           <div className="overflow-hidden rounded-2xl bg-[var(--accent-soft)]">
             {[
-              ['Try the Taiwan sample', () => actions.addSampleTrip()],
+              [session ? 'Try the Taiwan sample' : 'Try the Taiwan sample (sign in first)', () => (setMsg(''), actions.addSampleTrip().catch((e: Error) => setMsg(e.message)))],
               ['Import Google Maps lists', () => setImporting(true)],
               ['Import a trips file', () => file.current?.click()],
               [

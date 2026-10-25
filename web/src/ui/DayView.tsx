@@ -60,7 +60,26 @@ function LinkPill({ tripId, dayId, zone, from, link, fromColor, toColor }: { tri
   )
 }
 
-function StopRow({ tripId, day, geo, stop, index, group }: { tripId: string; day: Day; geo: DayGeo; stop: Stop; index: number; group: Stop[] }) {
+/** Review sites have no free API we can show next to this map, so each stop links out to its reviews instead. */
+function ReviewLinks({ stop, city }: { stop: Stop; city?: string }) {
+  const q = encodeURIComponent(city ? `${stop.name}, ${city}` : stop.name)
+  const sites: [string, string][] = [
+    ['Google', `https://www.google.com/maps/search/?api=1&query=${q}`],
+    ['Tripadvisor', `https://www.tripadvisor.com/Search?q=${q}`],
+  ]
+  if (stop.category === 'food' || stop.category === 'cafe') sites.push(['Yelp', `https://www.yelp.com/search?find_desc=${encodeURIComponent(stop.name)}&find_loc=${encodeURIComponent(city ?? `${stop.lat},${stop.lon}`)}`])
+  return (
+    <div className="mt-0.5 flex gap-3 text-[12px]">
+      {sites.map(([label, href]) => (
+        <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)]" aria-label={`${label} reviews for ${stop.name}`}>
+          {label} ↗
+        </a>
+      ))}
+    </div>
+  )
+}
+
+function StopRow({ tripId, day, geo, stop, index, group, city }: { tripId: string; day: Day; geo: DayGeo; stop: Stop; index: number; group: Stop[]; city?: string }) {
   const pos = group.findIndex((s) => s.id === stop.id)
   const shift = (delta: number) => {
     const neighbor = group[pos + delta]
@@ -77,6 +96,7 @@ function StopRow({ tripId, day, geo, stop, index, group }: { tripId: string; day
           {icon[stop.category]} {stop.name}
         </div>
         {stop.why && <Sub>{stop.why}</Sub>}
+        {stop.category !== 'transit' && <ReviewLinks stop={stop} city={city} />}
       </div>
       <button className="h-11 w-10 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${stop.name} up`} disabled={pos === 0} onClick={() => shift(-1)}>↑</button>
       <button className="h-11 w-10 shrink-0 rounded-lg text-[var(--text-2)] disabled:opacity-20" aria-label={`Move ${stop.name} down`} disabled={pos === group.length - 1} onClick={() => shift(1)}>↓</button>
@@ -128,7 +148,7 @@ function ZoneCard({ trip, day, geo, index }: { trip: Trip; day: Day; geo: DayGeo
                   {leg ? `🚶 ${leg.minutes} min · ${leg.km} km` : geo.routeError ? '🚶 walk time unavailable' : '🚶 …'}
                 </div>
               )}
-              <StopRow tripId={trip.id} day={day} geo={geo} stop={s} index={gi} group={group} />
+              <StopRow tripId={trip.id} day={day} geo={geo} stop={s} index={gi} group={group} city={trip.cities.find((c) => c.id === day.cityId)?.name} />
             </div>
           )
         })}
@@ -202,7 +222,7 @@ export default function DayView({ trip, day, geo }: { trip: Trip; day: Day; geo:
         <section className="space-y-1">
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-2)]">Not in an area yet</h2>
           {loose.map((s) => (
-            <StopRow key={s.id} tripId={trip.id} day={day} geo={geo} stop={s} index={geo.stops.indexOf(s)} group={loose} />
+            <StopRow key={s.id} tripId={trip.id} day={day} geo={geo} stop={s} index={geo.stops.indexOf(s)} group={loose} city={trip.cities.find((c) => c.id === day.cityId)?.name} />
           ))}
         </section>
       )}
