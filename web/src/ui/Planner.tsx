@@ -78,7 +78,9 @@ export default function Planner({ trip }: { trip: Trip }) {
   const abort = useRef<AbortController | null>(null)
   const top = useRef<HTMLDivElement>(null)
   // Each step starts at its top, not wherever the last one was scrolled to.
-  useEffect(() => top.current?.scrollIntoView({ block: 'nearest' }), [phase])
+  useEffect(() => {
+    top.current?.scrollIntoView({ block: 'nearest' })
+  }, [phase])
 
   const toggle = (k: string) => setOff((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set(s).add(k)))
   const onStep = (s: Step) => setSteps((x) => [...x, s])
