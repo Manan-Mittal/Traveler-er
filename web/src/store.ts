@@ -185,11 +185,14 @@ export const actions = {
       return { ...t, days: t.days.map((d, i) => ({ ...d, cityId: t.cities[Math.min(n - 1, Math.floor((i * n) / t.days.length))].id })) }
     })
   },
-  addZone(tripId: string, dayId: string, zone: Omit<Zone, 'id'>) {
+  /** Returns the new zone's id. */
+  addZone(tripId: string, dayId: string, zone: Omit<Zone, 'id'>): string {
+    const id = uid()
     updateTrip(tripId, (t) => ({
       ...t,
-      days: t.days.map((d) => (d.id === dayId ? { ...d, zones: [...d.zones, { ...zone, id: uid() }] } : d)),
+      days: t.days.map((d) => (d.id === dayId ? { ...d, zones: [...d.zones, { ...zone, id }] } : d)),
     }))
+    return id
   },
   patchZone(tripId: string, dayId: string, zoneId: string, patch: Partial<Omit<Zone, 'id'>>) {
     updateTrip(tripId, (t) => ({

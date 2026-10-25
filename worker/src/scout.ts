@@ -1,7 +1,7 @@
 import type { Candidate } from './verify.ts'
 import { isHyped } from './verify.ts'
 
-interface Osm {
+export interface Osm {
   elements: { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> }[]
 }
 
@@ -23,10 +23,10 @@ const MIRRORS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ]
 
-const UA = 'Traveler-er/0.1 (https://github.com/Manan-Mittal/Traveler-er)'
+export const UA = 'Traveler-er/0.1 (https://github.com/Manan-Mittal/Traveler-er)'
 
 /** Public Overpass servers are often overloaded or block cloud traffic, so ask all of them at once and take the first answer. */
-async function overpass(query: string): Promise<Osm> {
+export async function overpass(query: string): Promise<Osm> {
   const ask = async (url: string): Promise<Osm> => {
     const host = new URL(url).hostname
     let r: Response
