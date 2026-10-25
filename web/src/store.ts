@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { Booking, Day, Stop, Trip } from './types'
+import type { Booking, City, Day, Stop, Trip, Zone } from './types'
 
 const KEY = 'traveler-er:v1'
 
@@ -16,24 +16,45 @@ const str = (x: unknown, fallback = '') => (typeof x === 'string' ? x : fallback
 const isDate = (x: unknown): x is string => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) && !isNaN(Date.parse(x))
 const httpUrl = (x: unknown) => (typeof x === 'string' && /^https?:\/\//i.test(x.trim()) ? x.trim() : undefined)
 
+const cleanStops = (list: unknown): Stop[] =>
+  (Array.isArray(list) ? list : [])
+    .filter((s): s is Stop => isObj(s) && typeof s.lat === 'number' && typeof s.lon === 'number' && typeof s.name === 'string')
+    .map((s) => ({ ...s, id: str(s.id) || uid(), url: httpUrl(s.url) }))
+
+const cleanZones = (d: Record<string, unknown>): Zone[] => {
+  // Older saves had a single `zone` per day.
+  const raw = Array.isArray(d.zones) ? d.zones : isObj(d.zone) ? [d.zone] : []
+  return raw
+    .filter((z): z is Zone => isObj(z) && typeof z.lat === 'number' && typeof z.lon === 'number' && typeof z.name === 'string')
+    .map((z) => ({ ...z, id: str(z.id) || uid(), walkMinutes: [15, 30, 45, 60].includes(z.walkMinutes) ? z.walkMinutes : 30, arriveBy: z.arriveBy === 'drive' ? 'drive' : 'transit' }))
+}
+
+const cleanCities = (list: unknown): City[] =>
+  (Array.isArray(list) ? list : [])
+    .filter((c): c is City => isObj(c) && typeof c.lat === 'number' && typeof c.lon === 'number' && typeof c.name === 'string')
+    .map((c) => ({ ...c, id: str(c.id) || uid() }))
+
 /** Coerce untrusted JSON (old saves, import files) into a valid trip, or null if it isn't one. */
 const cleanTrip = (x: unknown): Trip | null => {
   if (!isObj(x) || typeof x.id !== 'string' || !x.id || !isDate(x.startDate) || !isDate(x.endDate)) return null
-  const days = (Array.isArray(x.days) ? x.days : []).filter(isObj).filter((d) => isDate(d.date)).map(
-    (d): Day => ({
-      ...(d as unknown as Day),
+  const cities = cleanCities(x.cities)
+  const days = (Array.isArray(x.days) ? x.days : []).filter(isObj).filter((d) => isDate(d.date)).map((d): Day => {
+    const { zone: _legacy, ...rest } = d
+    void _legacy
+    return {
+      ...(rest as unknown as Day),
       id: str(d.id) || uid(),
       title: str(d.title),
       notes: str(d.notes),
-      stops: (Array.isArray(d.stops) ? d.stops : []).filter(
-        (s): s is Stop => isObj(s) && typeof s.lat === 'number' && typeof s.lon === 'number' && typeof s.name === 'string',
-      ).map((s) => ({ ...s, id: str(s.id) || uid() })),
-    }),
-  )
+      cityId: cities.some((c) => c.id === d.cityId) ? (d.cityId as string) : undefined,
+      zones: cleanZones(d),
+      stops: cleanStops(d.stops),
+    }
+  })
   const bookings = (Array.isArray(x.bookings) ? x.bookings : []).filter(isObj).map(
     (b): Booking => ({ ...(b as unknown as Booking), id: str(b.id) || uid(), title: str(b.title), deadline: isDate(b.deadline) ? b.deadline : undefined, status: b.status === 'booked' ? 'booked' : 'todo', url: httpUrl(b.url) }),
   )
-  return { ...(x as unknown as Trip), name: str(x.name, 'Untitled trip'), days, bookings }
+  return { ...(x as unknown as Trip), name: str(x.name, 'Untitled trip'), cities, days, inbox: cleanStops(x.inbox), bookings }
 }
 
 const cleanTrips = (list: unknown[]): Trip[] => {
@@ -111,10 +132,11 @@ export const actions = {
       id: uid(),
       date,
       title: `Day ${i + 1}`,
+      zones: [],
       stops: [],
       notes: '',
     }))
-    const trip: Trip = { id: uid(), name, startDate, endDate, days, bookings: [], createdAt: Date.now(), updatedAt: Date.now() }
+    const trip: Trip = { id: uid(), name, startDate, endDate, cities: [], days, inbox: [], bookings: [], createdAt: Date.now(), updatedAt: Date.now() }
     set({ trips: [trip, ...state.trips], tripId: trip.id, dayId: days[0]?.id ?? null })
   },
   deleteTrip(id: string) {
@@ -129,6 +151,70 @@ export const actions = {
   },
   patchDay(tripId: string, dayId: string, patch: Partial<Day>) {
     updateTrip(tripId, (t) => ({ ...t, days: t.days.map((d) => (d.id === dayId ? { ...d, ...patch } : d)) }))
+  },
+  addCity(tripId: string, city: Omit<City, 'id'>) {
+    updateTrip(tripId, (t) => ({ ...t, cities: [...t.cities, { ...city, id: uid() }] }))
+  },
+  removeCity(tripId: string, cityId: string) {
+    updateTrip(tripId, (t) => ({
+      ...t,
+      cities: t.cities.filter((c) => c.id !== cityId),
+      days: t.days.map((d) => (d.cityId === cityId ? { ...d, cityId: undefined } : d)),
+      inbox: t.inbox.map((s) => (s.cityId === cityId ? { ...s, cityId: undefined } : s)),
+    }))
+  },
+  setDayCity(tripId: string, dayId: string, cityId: string | undefined) {
+    updateTrip(tripId, (t) => ({ ...t, days: t.days.map((d) => (d.id === dayId ? { ...d, cityId } : d)) }))
+  },
+  addZone(tripId: string, dayId: string, zone: Omit<Zone, 'id'>) {
+    updateTrip(tripId, (t) => ({
+      ...t,
+      days: t.days.map((d) => (d.id === dayId ? { ...d, zones: [...d.zones, { ...zone, id: uid() }] } : d)),
+    }))
+  },
+  patchZone(tripId: string, dayId: string, zoneId: string, patch: Partial<Omit<Zone, 'id'>>) {
+    updateTrip(tripId, (t) => ({
+      ...t,
+      days: t.days.map((d) => (d.id === dayId ? { ...d, zones: d.zones.map((z) => (z.id === zoneId ? { ...z, ...patch } : z)) } : d)),
+    }))
+  },
+  removeZone(tripId: string, dayId: string, zoneId: string) {
+    updateTrip(tripId, (t) => ({
+      ...t,
+      days: t.days.map((d) =>
+        d.id === dayId ? { ...d, zones: d.zones.filter((z) => z.id !== zoneId), stops: d.stops.map((s) => (s.zoneId === zoneId ? { ...s, zoneId: undefined } : s)) } : d,
+      ),
+    }))
+  },
+  moveZone(tripId: string, dayId: string, from: number, to: number) {
+    updateTrip(tripId, (t) => ({
+      ...t,
+      days: t.days.map((d) => {
+        if (d.id !== dayId || to < 0 || to >= d.zones.length) return d
+        const zones = [...d.zones]
+        zones.splice(to, 0, zones.splice(from, 1)[0])
+        return { ...d, zones }
+      }),
+    }))
+  },
+  /** Saves places to the trip without putting them in a day yet. */
+  addToInbox(tripId: string, stops: Omit<Stop, 'id'>[]) {
+    updateTrip(tripId, (t) => ({ ...t, inbox: [...t.inbox, ...stops.map((s) => ({ ...s, id: uid() }))] }))
+  },
+  removeFromInbox(tripId: string, stopId: string) {
+    updateTrip(tripId, (t) => ({ ...t, inbox: t.inbox.filter((s) => s.id !== stopId) }))
+  },
+  /** Moves a place from the inbox into a day (and optionally one of its zones). */
+  assignFromInbox(tripId: string, stopId: string, dayId: string, zoneId?: string) {
+    updateTrip(tripId, (t) => {
+      const stop = t.inbox.find((s) => s.id === stopId)
+      if (!stop) return t
+      return {
+        ...t,
+        inbox: t.inbox.filter((s) => s.id !== stopId),
+        days: t.days.map((d) => (d.id === dayId ? { ...d, stops: [...d.stops, { ...stop, zoneId, cityId: d.cityId ?? stop.cityId }] } : d)),
+      }
+    })
   },
   addStop(tripId: string, dayId: string, stop: Omit<Stop, 'id'>) {
     updateTrip(tripId, (t) => ({
