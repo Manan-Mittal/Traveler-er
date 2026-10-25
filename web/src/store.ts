@@ -204,7 +204,7 @@ export const actions = {
     updateTrip(tripId, (t) => ({
       ...t,
       days: t.days.map((d) =>
-        d.id === dayId ? { ...d, zones: d.zones.filter((z) => z.id !== zoneId), stops: d.stops.map((s) => (s.zoneId === zoneId ? { ...s, zoneId: undefined } : s)) } : d,
+        d.id === dayId ? { ...d, zones: d.zones.filter((z) => z.id !== zoneId), stops: d.stops.filter((s) => s.zoneId !== zoneId) } : d,
       ),
     }))
   },

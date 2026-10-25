@@ -61,6 +61,7 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   const labels = useRef<maplibregl.Marker[]>([])
   const ready = useRef(false)
   const idleRef = useRef(true)
+  const [tilesDown, setTilesDown] = useState(false)
   const [onGlobe, setOnGlobe] = useState(true)
   const spin = useRef<{ on: boolean; raf: number; stopped: boolean }>({ on: false, raf: 0, stopped: false })
   const latest = useRef({ zones, route, links })
@@ -102,7 +103,16 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
       a?.removeAttribute('open')
     }
     m.once('idle', foldAttribution)
-    m.on('load', () => {
+    // If the tile style can't be fetched, 'load' never fires and nothing would draw. Swap in a plain style so zones and routes still show.
+    let fellBack = false
+    m.on('error', (e) => {
+      const url = String((e.error as { url?: string } | undefined)?.url ?? '')
+      if (fellBack || ready.current || !url.includes('/styles/')) return
+      fellBack = true
+      setTilesDown(true)
+      m.setStyle({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#dfe6ee' } }] })
+    })
+    m.on('style.load', () => {
       foldAttribution()
       m.addSource('zone', { type: 'geojson', data: empty })
       m.addSource('route', { type: 'geojson', data: empty })
@@ -133,6 +143,8 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
   }, [])
 
   useEffect(paint, [zones, route, links])
+
+  const fitKey = JSON.stringify([stops.map((s) => [s.lat, s.lon]), zones.map((g) => [g.zone.lat, g.zone.lon, !!g.polygon]), center && [center.lat, center.lon], sheetTop])
 
   useEffect(() => {
     const m = map.current
@@ -200,20 +212,33 @@ export default function MapView({ stops, zones, route, links, center, inZone, co
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     let frame = 0
     setWorldLine('visible')
+    const start = () => {
+      if (s.on && !s.stopped) s.raf = requestAnimationFrame(tick)
+    }
     const tick = () => {
       if (!s.on || s.stopped) return
       frame++
       m.jumpTo({ center: [m.getCenter().lng + 0.06, m.getCenter().lat] })
       s.raf = requestAnimationFrame(tick)
     }
-    s.raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(s.raf)
-  }, [stops, zones, center, sheetTop])
+    // Start spinning once the fly-out ends; a jump on the next frame would cancel it.
+    m.once('moveend', start)
+    return () => {
+      m.off('moveend', start)
+      cancelAnimationFrame(s.raf)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey])
 
   // maplibre's own CSS forces position: relative on the map element, so the absolute layer lives on a wrapper.
   return (
     <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 60% 40%, #1c2b4a 0%, #0b1220 70%)' }}>
       <div ref={el} className="h-full w-full" />
+      {tilesDown && (
+        <div role="status" className="glass pointer-events-none absolute left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] -translate-x-1/2 px-3 py-1.5 text-[12px] md:left-[calc(50%+200px)]">
+          Map tiles couldn't load, so the base map is blank. Areas and routes still show.
+        </div>
+      )}
       {onGlobe && (
         <div className="pointer-events-none absolute inset-x-0 top-[max(3rem,env(safe-area-inset-top))] px-6 text-center text-white md:top-8 md:pl-[400px] landscape:pl-[min(400px,50%)]">
           <div className="text-[26px] font-bold tracking-tight drop-shadow md:text-[34px]">Where to next?</div>
