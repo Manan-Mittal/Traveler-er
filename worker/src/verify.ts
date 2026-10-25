@@ -4,7 +4,7 @@ export interface Candidate {
   lat: number
   lon: number
   category: string
-  source: 'osm' | 'wikivoyage'
+  source: 'osm' | 'wikivoyage' | 'wikipedia'
 }
 
 export interface Pick {
