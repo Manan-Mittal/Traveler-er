@@ -127,7 +127,8 @@ export const actions = {
     set({ ...state, trips: [...fresh, ...state.trips] })
     return { added: fresh.length, skipped: data.trips.length - fresh.length }
   },
-  createTrip(name: string, startDate: string, endDate: string) {
+  /** Returns the new trip's id. */
+  createTrip(name: string, startDate: string, endDate: string): string {
     const days: Day[] = dayList(startDate, endDate).map((date, i) => ({
       id: uid(),
       date,
@@ -138,6 +139,7 @@ export const actions = {
     }))
     const trip: Trip = { id: uid(), name, startDate, endDate, cities: [], days, inbox: [], bookings: [], createdAt: Date.now(), updatedAt: Date.now() }
     set({ trips: [trip, ...state.trips], tripId: trip.id, dayId: days[0]?.id ?? null })
+    return trip.id
   },
   deleteTrip(id: string) {
     set({ trips: state.trips.filter((t) => t.id !== id), tripId: null, dayId: null })
@@ -152,8 +154,11 @@ export const actions = {
   patchDay(tripId: string, dayId: string, patch: Partial<Day>) {
     updateTrip(tripId, (t) => ({ ...t, days: t.days.map((d) => (d.id === dayId ? { ...d, ...patch } : d)) }))
   },
-  addCity(tripId: string, city: Omit<City, 'id'>) {
-    updateTrip(tripId, (t) => ({ ...t, cities: [...t.cities, { ...city, id: uid() }] }))
+  /** Returns the new city's id. */
+  addCity(tripId: string, city: Omit<City, 'id'>): string {
+    const id = uid()
+    updateTrip(tripId, (t) => ({ ...t, cities: [...t.cities, { ...city, id }] }))
+    return id
   },
   removeCity(tripId: string, cityId: string) {
     updateTrip(tripId, (t) => ({
